@@ -19,8 +19,8 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"github.com/zmap/zdns"
-	"github.com/zmap/zdns/modules/miekg"
+	"../../../zdns"
+	"../../../zdns/modules/miekg"
 )
 
 // result to be returned by scan of host
@@ -52,9 +52,9 @@ func (s *Lookup) lookupIPs(name string, dnsType uint16) ([]string, []interface{}
 	var addresses []string
 	res, trace, status, _ := s.DoTypedMiekgLookup(name, dnsType)
 	if status == zdns.STATUS_NOERROR {
-		cast, _ := res.(miekg.Result)
+		cast, _ := res.(zdns.MiekgResult)
 		for _, innerRes := range cast.Answers {
-			castInnerRes := innerRes.(miekg.Answer)
+			castInnerRes := innerRes.(zdns.MiekgAnswer)
 			addresses = append(addresses, castInnerRes.Answer)
 		}
 	}
@@ -67,11 +67,11 @@ func (s *Lookup) DoNSLookup(name string, lookupIPv4 bool, lookupIPv6 bool) (Resu
 	if status != zdns.STATUS_NOERROR || err != nil {
 		return retv, trace, status, nil
 	}
-	ns := res.(miekg.Result)
+	ns := res.(zdns.MiekgResult)
 	ipv4s := make(map[string]string)
 	ipv6s := make(map[string]string)
 	for _, ans := range ns.Additional {
-		a, ok := ans.(miekg.Answer)
+		a, ok := ans.(zdns.MiekgAnswer)
 		if !ok {
 			continue
 		}
@@ -82,7 +82,7 @@ func (s *Lookup) DoNSLookup(name string, lookupIPv4 bool, lookupIPv6 bool) (Resu
 		}
 	}
 	for _, ans := range ns.Answers {
-		a, ok := ans.(miekg.Answer)
+		a, ok := ans.(zdns.MiekgAnswer)
 		if !ok {
 			continue
 		}

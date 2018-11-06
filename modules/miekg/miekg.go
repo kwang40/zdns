@@ -8,32 +8,21 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	log "github.com/sirupsen/logrus"
-
 	"github.com/miekg/dns"
 	"github.com/zmap/go-iptree/blacklist"
-	"github.com/zmap/zdns"
-	"github.com/zmap/zdns/cachehash"
+	"../../../zdns"
+	"../../../zdns/cachehash"
+
 )
 
-type Answer struct {
-	Ttl     uint32 `json:"ttl,omitempty"`
-	Type    string `json:"type,omitempty"`
-	rrType  uint16
-	Class   string `json:"class,omitempty"`
-	rrClass uint16
-	Name    string `json:"name,omitempty"`
-	Answer  string `json:"answer,omitempty"`
-}
-
 type MXAnswer struct {
-	Answer
+	Answer 	   zdns.MiekgAnswer
 	Preference uint16 `json:"preference"`
 }
 
 type DSAnswer struct {
-	Answer
+	Answer 	  zdns.MiekgAnswer
 	KeyTag     uint16 `json:"key_tag"`
 	Algorithm  uint8  `json:"algorithm"`
 	DigestType uint8  `json:"digest_type"`
@@ -41,7 +30,7 @@ type DSAnswer struct {
 }
 
 type DNSKEYAnswer struct {
-	Answer
+	Answer 	  zdns.MiekgAnswer
 	Flags     uint16 `json:"flags"`
 	Protocol  uint8  `json:"protocol"`
 	Algorithm uint8  `json:"algorithm"`
@@ -49,14 +38,14 @@ type DNSKEYAnswer struct {
 }
 
 type CAAAnswer struct {
-	Answer
+	Answer 	  zdns.MiekgAnswer
 	Tag   string `json:"tag"`
 	Value string `json:"value"`
 	Flag  uint8  `json:"flag"`
 }
 
 type SOAAnswer struct {
-	Answer
+	Answer 	zdns.MiekgAnswer
 	Ns      string `json:"ns"`
 	Mbox    string `json:"mbox"`
 	Serial  uint32 `json:"serial"`
@@ -88,7 +77,7 @@ type Result struct {
 }
 
 type TraceStep struct {
-	Result     Result   `json:"results"`
+	Result     zdns.MiekgResult   `json:"results"`
 	DnsType    uint16   `json:"type"`
 	DnsClass   uint16   `json:"class"`
 	Name       string   `json:"name"`
@@ -127,38 +116,38 @@ func dotName(name string) string {
 }
 
 func ParseAnswer(ans dns.RR) interface{} {
-	var retv Answer
+	var retv zdns.MiekgAnswer
 	if a, ok := ans.(*dns.A); ok {
-		retv = Answer{
+		retv = zdns.MiekgAnswer{
 			Ttl:     a.Hdr.Ttl,
 			Type:    dns.Type(a.Hdr.Rrtype).String(),
-			rrType:  a.Hdr.Rrtype,
+			RrType:  a.Hdr.Rrtype,
 			Class:   dns.Class(a.Hdr.Class).String(),
-			rrClass: a.Hdr.Class,
+			RrClass: a.Hdr.Class,
 			Name:    a.Hdr.Name,
 			Answer:  a.A.String()}
 	} else if aaaa, ok := ans.(*dns.AAAA); ok {
-		retv = Answer{Ttl: aaaa.Hdr.Ttl, Type: dns.Type(aaaa.Hdr.Rrtype).String(), rrType: aaaa.Hdr.Rrtype, Class: dns.Class(aaaa.Hdr.Class).String(), rrClass: aaaa.Hdr.Class, Name: aaaa.Hdr.Name, Answer: aaaa.AAAA.String()}
+		retv = zdns.MiekgAnswer{Ttl: aaaa.Hdr.Ttl, Type: dns.Type(aaaa.Hdr.Rrtype).String(), RrType: aaaa.Hdr.Rrtype, Class: dns.Class(aaaa.Hdr.Class).String(), RrClass: aaaa.Hdr.Class, Name: aaaa.Hdr.Name, Answer: aaaa.AAAA.String()}
 	} else if cname, ok := ans.(*dns.CNAME); ok {
-		retv = Answer{Ttl: cname.Hdr.Ttl, Type: dns.Type(cname.Hdr.Rrtype).String(), rrType: cname.Hdr.Rrtype, Class: dns.Class(cname.Hdr.Class).String(), rrClass: cname.Hdr.Class, Name: cname.Hdr.Name, Answer: cname.Target}
+		retv = zdns.MiekgAnswer{Ttl: cname.Hdr.Ttl, Type: dns.Type(cname.Hdr.Rrtype).String(), RrType: cname.Hdr.Rrtype, Class: dns.Class(cname.Hdr.Class).String(), RrClass: cname.Hdr.Class, Name: cname.Hdr.Name, Answer: cname.Target}
 	} else if dname, ok := ans.(*dns.DNAME); ok {
-		retv = Answer{Ttl: dname.Hdr.Ttl, Type: dns.Type(dname.Hdr.Rrtype).String(), rrType: dname.Hdr.Rrtype, Class: dns.Class(dname.Hdr.Class).String(), rrClass: dname.Hdr.Class, Name: dname.Hdr.Name, Answer: dname.Target}
+		retv = zdns.MiekgAnswer{Ttl: dname.Hdr.Ttl, Type: dns.Type(dname.Hdr.Rrtype).String(), RrType: dname.Hdr.Rrtype, Class: dns.Class(dname.Hdr.Class).String(), RrClass: dname.Hdr.Class, Name: dname.Hdr.Name, Answer: dname.Target}
 	} else if txt, ok := ans.(*dns.TXT); ok {
-		retv = Answer{Ttl: txt.Hdr.Ttl, Type: dns.Type(txt.Hdr.Rrtype).String(), rrType: txt.Hdr.Rrtype, Class: dns.Class(txt.Hdr.Class).String(), rrClass: txt.Hdr.Class, Name: txt.Hdr.Name, Answer: strings.Join(txt.Txt, "\n")}
+		retv = zdns.MiekgAnswer{Ttl: txt.Hdr.Ttl, Type: dns.Type(txt.Hdr.Rrtype).String(), RrType: txt.Hdr.Rrtype, Class: dns.Class(txt.Hdr.Class).String(), RrClass: txt.Hdr.Class, Name: txt.Hdr.Name, Answer: strings.Join(txt.Txt, "\n")}
 	} else if ns, ok := ans.(*dns.NS); ok {
-		retv = Answer{Ttl: ns.Hdr.Ttl, Type: dns.Type(ns.Hdr.Rrtype).String(), rrType: ns.Hdr.Rrtype, Class: dns.Class(ns.Hdr.Class).String(), rrClass: ns.Hdr.Class, Name: ns.Hdr.Name, Answer: strings.TrimRight(ns.Ns, ".")}
+		retv = zdns.MiekgAnswer{Ttl: ns.Hdr.Ttl, Type: dns.Type(ns.Hdr.Rrtype).String(), RrType: ns.Hdr.Rrtype, Class: dns.Class(ns.Hdr.Class).String(), RrClass: ns.Hdr.Class, Name: ns.Hdr.Name, Answer: strings.TrimRight(ns.Ns, ".")}
 	} else if ptr, ok := ans.(*dns.PTR); ok {
-		retv = Answer{Ttl: ptr.Hdr.Ttl, Type: dns.Type(ptr.Hdr.Rrtype).String(), rrType: ptr.Hdr.Rrtype, Class: dns.Class(ptr.Hdr.Class).String(), rrClass: ptr.Hdr.Class, Name: ptr.Hdr.Name, Answer: ptr.Ptr}
+		retv = zdns.MiekgAnswer{Ttl: ptr.Hdr.Ttl, Type: dns.Type(ptr.Hdr.Rrtype).String(), RrType: ptr.Hdr.Rrtype, Class: dns.Class(ptr.Hdr.Class).String(), RrClass: ptr.Hdr.Class, Name: ptr.Hdr.Name, Answer: ptr.Ptr}
 	} else if spf, ok := ans.(*dns.SPF); ok {
-		retv = Answer{Ttl: spf.Hdr.Ttl, Type: dns.Type(spf.Hdr.Rrtype).String(), rrType: spf.Hdr.Rrtype, Class: dns.Class(spf.Hdr.Class).String(), rrClass: spf.Hdr.Class, Name: spf.Hdr.Name, Answer: spf.String()}
+		retv = zdns.MiekgAnswer{Ttl: spf.Hdr.Ttl, Type: dns.Type(spf.Hdr.Rrtype).String(), RrType: spf.Hdr.Rrtype, Class: dns.Class(spf.Hdr.Class).String(), RrClass: spf.Hdr.Class, Name: spf.Hdr.Name, Answer: spf.String()}
 	} else if mx, ok := ans.(*dns.MX); ok {
 		return MXAnswer{
-			Answer: Answer{
+			Answer: zdns.MiekgAnswer{
 				Name:    strings.TrimRight(mx.Hdr.Name, "."),
 				Type:    dns.Type(mx.Hdr.Rrtype).String(),
-				rrType:  mx.Hdr.Rrtype,
+				RrType:  mx.Hdr.Rrtype,
 				Class:   dns.Class(mx.Hdr.Class).String(),
-				rrClass: mx.Hdr.Class,
+				RrClass: mx.Hdr.Class,
 				Ttl:     mx.Hdr.Ttl,
 				Answer:  strings.TrimRight(mx.Mx, "."),
 			},
@@ -166,13 +155,13 @@ func ParseAnswer(ans dns.RR) interface{} {
 		}
 	} else if ds, ok := ans.(*dns.DS); ok {
 		return DSAnswer{
-			Answer: Answer{
+			Answer: zdns.MiekgAnswer{
 				Name:    ds.Hdr.Name,
 				Ttl:     ds.Hdr.Ttl,
 				Type:    dns.Type(ds.Hdr.Rrtype).String(),
-				rrType:  ds.Hdr.Rrtype,
+				RrType:  ds.Hdr.Rrtype,
 				Class:   dns.Class(ds.Hdr.Class).String(),
-				rrClass: ds.Hdr.Class,
+				RrClass: ds.Hdr.Class,
 			},
 			KeyTag:     ds.KeyTag,
 			Algorithm:  ds.Algorithm,
@@ -181,13 +170,13 @@ func ParseAnswer(ans dns.RR) interface{} {
 		}
 	} else if dnskey, ok := ans.(*dns.DNSKEY); ok {
 		return DNSKEYAnswer{
-			Answer: Answer{
+			Answer: zdns.MiekgAnswer{
 				Name:    dnskey.Hdr.Name,
 				Ttl:     dnskey.Hdr.Ttl,
 				Type:    dns.Type(dnskey.Hdr.Rrtype).String(),
-				rrType:  dnskey.Hdr.Rrtype,
+				RrType:  dnskey.Hdr.Rrtype,
 				Class:   dns.Class(dnskey.Hdr.Class).String(),
-				rrClass: dnskey.Hdr.Class,
+				RrClass: dnskey.Hdr.Class,
 			},
 			Flags:     dnskey.Flags,
 			Protocol:  dnskey.Protocol,
@@ -196,13 +185,13 @@ func ParseAnswer(ans dns.RR) interface{} {
 		}
 	} else if cds, ok := ans.(*dns.CDS); ok {
 		return DSAnswer{
-			Answer: Answer{
+			Answer: zdns.MiekgAnswer{
 				Name:    cds.Hdr.Name,
 				Ttl:     cds.Hdr.Ttl,
 				Type:    dns.Type(cds.Hdr.Rrtype).String(),
-				rrType:  cds.Hdr.Rrtype,
+				RrType:  cds.Hdr.Rrtype,
 				Class:   dns.Class(cds.Hdr.Class).String(),
-				rrClass: cds.Hdr.Class,
+				RrClass: cds.Hdr.Class,
 			},
 			KeyTag:     cds.KeyTag,
 			Algorithm:  cds.Algorithm,
@@ -211,13 +200,13 @@ func ParseAnswer(ans dns.RR) interface{} {
 		}
 	} else if cdnskey, ok := ans.(*dns.CDNSKEY); ok {
 		return DNSKEYAnswer{
-			Answer: Answer{
+			Answer: zdns.MiekgAnswer{
 				Name:    cdnskey.Hdr.Name,
 				Ttl:     cdnskey.Hdr.Ttl,
 				Type:    dns.Type(cdnskey.Hdr.Rrtype).String(),
-				rrType:  cdnskey.Hdr.Rrtype,
+				RrType:  cdnskey.Hdr.Rrtype,
 				Class:   dns.Class(cdnskey.Hdr.Class).String(),
-				rrClass: cdnskey.Hdr.Class,
+				RrClass: cdnskey.Hdr.Class,
 			},
 			Flags:     cdnskey.Flags,
 			Protocol:  cdnskey.Protocol,
@@ -226,13 +215,13 @@ func ParseAnswer(ans dns.RR) interface{} {
 		}
 	} else if caa, ok := ans.(*dns.CAA); ok {
 		return CAAAnswer{
-			Answer: Answer{
+			Answer: zdns.MiekgAnswer{
 				Name:    caa.Hdr.Name,
 				Ttl:     caa.Hdr.Ttl,
 				Type:    dns.Type(caa.Hdr.Rrtype).String(),
-				rrType:  caa.Hdr.Rrtype,
+				RrType:  caa.Hdr.Rrtype,
 				Class:   dns.Class(caa.Hdr.Class).String(),
-				rrClass: caa.Hdr.Class,
+				RrClass: caa.Hdr.Class,
 			},
 			Tag:   caa.Tag,
 			Value: caa.Value,
@@ -240,12 +229,12 @@ func ParseAnswer(ans dns.RR) interface{} {
 		}
 	} else if soa, ok := ans.(*dns.SOA); ok {
 		return SOAAnswer{
-			Answer: Answer{
+			Answer: zdns.MiekgAnswer{
 				Name:    strings.TrimSuffix(soa.Hdr.Name, "."),
 				Type:    dns.Type(soa.Hdr.Rrtype).String(),
-				rrType:  soa.Hdr.Rrtype,
+				RrType:  soa.Hdr.Rrtype,
 				Class:   dns.Class(soa.Hdr.Class).String(),
-				rrClass: soa.Hdr.Class,
+				RrClass: soa.Hdr.Class,
 				Ttl:     soa.Hdr.Ttl,
 			},
 			Ns:      strings.TrimSuffix(soa.Ns, "."),
@@ -259,15 +248,15 @@ func ParseAnswer(ans dns.RR) interface{} {
 	} else {
 		return struct {
 			Type     string `json:"type"`
-			rrType   uint16
+			RrType   uint16
 			Class    string `json:"class"`
-			rrClass  uint16
+			RrClass  uint16
 			Unparsed dns.RR `json:"-"`
 		}{
 			Type:     dns.Type(ans.Header().Rrtype).String(),
-			rrType:   ans.Header().Rrtype,
+			RrType:   ans.Header().Rrtype,
 			Class:    dns.Class(ans.Header().Class).String(),
-			rrClass:  ans.Header().Class,
+			RrClass:  ans.Header().Class,
 			Unparsed: ans,
 		}
 	}
@@ -347,7 +336,7 @@ func makeCacheKey(name string, dnsType uint16) interface{} {
 }
 
 func (s *GlobalLookupFactory) AddCachedAnswer(answer interface{}, name string, dnsType uint16, ttl uint32, depth int, threadID int) {
-	a, ok := answer.(Answer)
+	a, ok := answer.(zdns.MiekgAnswer)
 	if !ok {
 		// we can't cache this entry because we have no idea what to name it
 		return
@@ -376,9 +365,9 @@ func (s *GlobalLookupFactory) AddCachedAnswer(answer interface{}, name string, d
 	s.CacheMutex.Unlock()
 }
 
-func (s *GlobalLookupFactory) GetCachedResult(name string, dnsType uint16, isAuthCheck bool, depth int, threadID int) (Result, bool) {
+func (s *GlobalLookupFactory) GetCachedResult(name string, dnsType uint16, isAuthCheck bool, depth int, threadID int) (zdns.MiekgResult, bool) {
 	s.VerboseGlobalLog(depth+1, threadID, "Cache request for: ", name, " (", dnsType, ")")
-	var retv Result
+	var retv zdns.MiekgResult
 	key := makeCacheKey(name, dnsType)
 	s.CacheMutex.Lock()
 	unres, ok := s.IterativeCache.Get(key)
@@ -417,7 +406,7 @@ func (s *GlobalLookupFactory) GetCachedResult(name string, dnsType uint16, isAut
 	// Don't return an empty response.
 	if len(retv.Answers) == 0 && len(retv.Authorities) == 0 && len(retv.Additional) == 0 {
 		s.VerboseGlobalLog(depth+2, threadID, "-> no entry found in cache, after expiration")
-		var emptyRetv Result
+		var emptyRetv zdns.MiekgResult
 		return emptyRetv, false
 	}
 
@@ -489,13 +478,13 @@ func (s *Lookup) Initialize(nameServer string, dnsType uint16, dnsClass uint16, 
 	return nil
 }
 
-func (s *Lookup) doLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (Result, zdns.Status, error) {
+func (s *Lookup) doLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (zdns.MiekgResult, zdns.Status, error) {
 	return DoLookupWorker(s.Factory.Client, s.Factory.TCPClient, dnsType, dnsClass, name, nameServer, recursive)
 }
 
 // Expose the inner logic so other tools can use it
-func DoLookupWorker(udp *dns.Client, tcp *dns.Client, dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (Result, zdns.Status, error) {
-	res := Result{Answers: []interface{}{}, Authorities: []interface{}{}, Additional: []interface{}{}}
+func DoLookupWorker(udp *dns.Client, tcp *dns.Client, dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (zdns.MiekgResult, zdns.Status, error) {
+	res := zdns.MiekgResult{Answers: []interface{}{}, Authorities: []interface{}{}, Additional: []interface{}{}}
 
 	m := new(dns.Msg)
 	m.SetQuestion(dotName(name), dnsType)
@@ -570,7 +559,7 @@ func DoLookupWorker(udp *dns.Client, tcp *dns.Client, dnsType uint16, dnsClass u
 }
 
 func (s *Lookup) SafeAddCachedAnswer(a interface{}, layer string, debugType string, depth int) {
-	ans, ok := a.(Answer)
+	ans, ok := a.(zdns.MiekgAnswer)
 	if !ok {
 		s.VerboseLog(depth+1, "unable to cast ", debugType, ": ", layer, ": ", a)
 		return
@@ -580,10 +569,10 @@ func (s *Lookup) SafeAddCachedAnswer(a interface{}, layer string, debugType stri
 		log.Info("detected poison ", debugType, ": ", ans.Name, "(", ans.Type, "): ", layer, ": ", a)
 		return
 	}
-	s.Factory.Factory.AddCachedAnswer(a, ans.Name, ans.rrType, ans.Ttl, depth, s.Factory.ThreadID)
+	s.Factory.Factory.AddCachedAnswer(a, ans.Name, ans.RrType, ans.Ttl, depth, s.Factory.ThreadID)
 }
 
-func (s *Lookup) cacheUpdate(layer string, result Result, depth int) {
+func (s *Lookup) cacheUpdate(layer string, result zdns.MiekgResult, depth int) {
 	for _, a := range result.Additional {
 		s.SafeAddCachedAnswer(a, layer, "additional", depth)
 	}
@@ -597,7 +586,7 @@ func (s *Lookup) cacheUpdate(layer string, result Result, depth int) {
 	}
 }
 
-func (s *Lookup) tracedRetryingLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (Result, []interface{}, zdns.Status, error) {
+func (s *Lookup) tracedRetryingLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (zdns.MiekgResult, []interface{}, zdns.Status, error) {
 
 	res, status, err := s.retryingLookup(dnsType, dnsClass, name, nameServer, recursive)
 
@@ -619,14 +608,14 @@ func (s *Lookup) tracedRetryingLookup(dnsType uint16, dnsClass uint16, name stri
 	return res, trace, status, err
 }
 
-func (s *Lookup) retryingLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (Result, zdns.Status, error) {
+func (s *Lookup) retryingLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, recursive bool) (zdns.MiekgResult, zdns.Status, error) {
 	s.VerboseLog(1, "****WIRE LOOKUP***", name, " ", nameServer)
 
 	if dnsType == dns.TypePTR {
 		var err error
 		name, err = dns.ReverseAddr(name)
 		if err != nil {
-			var r Result
+			var r zdns.MiekgResult
 			return r, zdns.STATUS_ILLEGAL_INPUT, err
 		}
 		name = name[:len(name)-1]
@@ -646,13 +635,13 @@ func (s *Lookup) retryingLookup(dnsType uint16, dnsClass uint16, name string, na
 	panic("loop must return")
 }
 
-func (s *Lookup) cachedRetryingLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, layer string, depth int) (Result, IsCached, zdns.Status, error) {
+func (s *Lookup) cachedRetryingLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, layer string, depth int) (zdns.MiekgResult, IsCached, zdns.Status, error) {
 	var isCached IsCached
 	isCached = false
 	s.VerboseLog(depth+1, "Cached retrying lookup. Name: ", name, ", Layer: ", layer, ", Nameserver: ", nameServer)
 	if s.IterativeStop.Before(time.Now()) {
 		s.VerboseLog(depth+2, "ITERATIVE_TIMEOUT ", name, ", Layer: ", layer, ", Nameserver: ", nameServer)
-		var r Result
+		var r zdns.MiekgResult
 		return r, isCached, zdns.STATUS_ITER_TIMEOUT, nil
 	}
 	// First, we check the answer
@@ -669,12 +658,12 @@ func (s *Lookup) cachedRetryingLookup(dnsType uint16, dnsClass uint16, name stri
 		if blacklisted, err := s.Factory.Factory.Blacklist.IsBlacklisted(nameServerIP); err != nil {
 			s.Factory.Factory.BlMu.Unlock()
 			s.VerboseLog(depth+2, "Blacklist error!", err)
-			var r Result
+			var r zdns.MiekgResult
 			return r, isCached, zdns.STATUS_ERROR, err
 		} else if blacklisted {
 			s.Factory.Factory.BlMu.Unlock()
 			s.VerboseLog(depth+2, "Hit blacklisted nameserver ", name, ", Layer: ", layer, ", Nameserver: ", nameServer)
-			var r Result
+			var r zdns.MiekgResult
 			return r, isCached, zdns.STATUS_BLACKLIST, nil
 		}
 		s.Factory.Factory.BlMu.Unlock()
@@ -687,7 +676,7 @@ func (s *Lookup) cachedRetryingLookup(dnsType uint16, dnsClass uint16, name stri
 	if name != layer && authName != layer {
 		if authName == "" {
 			s.VerboseLog(depth+2, "Can't parse name to authority properly. name: ", name, ", layer: ", layer)
-			var r Result
+			var r zdns.MiekgResult
 			return r, isCached, zdns.STATUS_AUTHFAIL, nil
 		}
 		s.VerboseLog(depth+2, "Cache auth check for ", authName)
@@ -751,14 +740,14 @@ func nextAuthority(name string, layer string) string {
 	return next
 }
 
-func (s *Lookup) checkGlue(server string, depth int, result Result) (Result, zdns.Status) {
+func (s *Lookup) checkGlue(server string, depth int, result zdns.MiekgResult) (zdns.MiekgResult, zdns.Status) {
 	for _, additional := range result.Additional {
-		ans, ok := additional.(Answer)
+		ans, ok := additional.(zdns.MiekgAnswer)
 		if !ok {
 			continue
 		}
 		if ans.Type == "A" && strings.TrimSuffix(ans.Name, ".") == server {
-			var retv Result
+			var retv zdns.MiekgResult
 			retv.Authorities = make([]interface{}, 0)
 			retv.Answers = make([]interface{}, 0)
 			retv.Additional = make([]interface{}, 0)
@@ -768,14 +757,14 @@ func (s *Lookup) checkGlue(server string, depth int, result Result) (Result, zdn
 		}
 	}
 
-	var r Result
+	var r zdns.MiekgResult
 	return r, zdns.STATUS_SERVFAIL
 }
 
-func (s *Lookup) extractAuthority(authority interface{}, layer string, depth int, result Result, trace []interface{}) (string, zdns.Status, string, []interface{}) {
+func (s *Lookup) extractAuthority(authority interface{}, layer string, depth int, result zdns.MiekgResult, trace []interface{}) (string, zdns.Status, string, []interface{}) {
 
 	// Is it an answer
-	ans, ok := authority.(Answer)
+	ans, ok := authority.(zdns.MiekgAnswer)
 	if !ok {
 		return "", zdns.STATUS_SERVFAIL, layer, trace
 	}
@@ -802,7 +791,7 @@ func (s *Lookup) extractAuthority(authority interface{}, layer string, depth int
 	if status == zdns.STATUS_NOERROR {
 		// XXX we don't actually check the question here
 		for _, inner_a := range res.Answers {
-			inner_ans, ok := inner_a.(Answer)
+			inner_ans, ok := inner_a.(zdns.MiekgAnswer)
 			if !ok {
 				continue
 			}
@@ -856,9 +845,9 @@ func handleStatus(status *zdns.Status, err error) (*zdns.Status, error) {
 	}
 }
 
-func (s *Lookup) iterateOnAuthorities(dnsType uint16, dnsClass uint16, name string, depth int, result Result, layer string, trace []interface{}) (Result, []interface{}, zdns.Status, error) {
+func (s *Lookup) iterateOnAuthorities(dnsType uint16, dnsClass uint16, name string, depth int, result zdns.MiekgResult, layer string, trace []interface{}) (zdns.MiekgResult, []interface{}, zdns.Status, error) {
 	if len(result.Authorities) == 0 {
-		var r Result
+		var r zdns.MiekgResult
 		return r, trace, zdns.STATUS_SERVFAIL, nil
 	}
 	for _, elem := range result.Authorities {
@@ -877,7 +866,7 @@ func (s *Lookup) iterateOnAuthorities(dnsType uint16, dnsClass uint16, name stri
 				continue
 			} else {
 				// otherwise we hit a status we know
-				var r Result
+				var r zdns.MiekgResult
 				return r, trace, *new_status, err
 			}
 		}
@@ -898,17 +887,17 @@ func (s *Lookup) iterateOnAuthorities(dnsType uint16, dnsClass uint16, name stri
 		return r, trace, status, err
 	}
 	s.VerboseLog((depth + 1), "Unable to find authoritative name server")
-	var r Result
+	var r zdns.MiekgResult
 	return r, trace, zdns.STATUS_ERROR, errors.New("could not find authoritative name server")
 }
 
-func (s *Lookup) iterativeLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, depth int, layer string, trace []interface{}) (Result, []interface{}, zdns.Status, error) {
+func (s *Lookup) iterativeLookup(dnsType uint16, dnsClass uint16, name string, nameServer string, depth int, layer string, trace []interface{}) (zdns.MiekgResult, []interface{}, zdns.Status, error) {
 	if log.GetLevel() == log.DebugLevel {
 		//s.VerboseLog((depth), "iterative lookup for ", name, " (", dnsType, ") against ", nameServer, " (", debugReverseLookup(nameServer), ") layer ", layer)
 		s.VerboseLog((depth), "iterative lookup for ", name, " (", dnsType, ") against ", nameServer, " layer ", layer)
 	}
 	if depth > s.Factory.MaxDepth {
-		var r Result
+		var r zdns.MiekgResult
 		s.VerboseLog((depth + 1), "-> Max recursion depth reached")
 		return r, trace, zdns.STATUS_ERROR, errors.New("Max recursion depth reached")
 	}
@@ -1026,9 +1015,9 @@ func (s *Lookup) DoTxtLookup(name string) (string, []interface{}, zdns.Status, e
 	if status != zdns.STATUS_NOERROR {
 		return "", trace, status, err
 	}
-	if parsedResult, ok := res.(Result); ok {
+	if parsedResult, ok := res.(zdns.MiekgResult); ok {
 		for _, a := range parsedResult.Answers {
-			ans, _ := a.(Answer)
+			ans, _ := a.(zdns.MiekgAnswer)
 			if strings.HasPrefix(ans.Answer, s.Prefix) {
 				return ans.Answer, trace, zdns.STATUS_NOERROR, err
 			}

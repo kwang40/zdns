@@ -24,9 +24,9 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/zmap/go-iptree/blacklist"
-	"github.com/zmap/zdns"
-	"github.com/zmap/zdns/modules/miekg"
-	"github.com/zmap/zdns/modules/nslookup"
+	"../../../zdns"
+	"../../../zdns/modules/miekg"
+	"../../../zdns/modules/nslookup"
 )
 
 // Per Connection Lookup ======================================================

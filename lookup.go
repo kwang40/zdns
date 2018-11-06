@@ -30,6 +30,37 @@ type routineMetadata struct {
 	Names  int
 	Status map[Status]int
 }
+type MiekgAnswer struct {
+	Ttl     uint32 `json:"ttl,omitempty"`
+	Type    string `json:"type,omitempty"`
+	RrType  uint16
+	Class   string `json:"class,omitempty"`
+	RrClass uint16
+	Name    string `json:"name,omitempty"`
+	Answer  string `json:"answer,omitempty"`
+}
+
+type DNSFlags struct {
+	Response           bool `json:"response"`
+	Opcode             int  `json:"opcode"`
+	Authoritative      bool `json:"authoritative"`
+	Truncated          bool `json:"truncated"`
+	RecursionDesired   bool `json:"recursion_desired"`
+	RecursionAvailable bool `json:"recursion_available"`
+	Authenticated      bool `json:"authenticated"`
+	CheckingDisabled   bool `json:"checking_disabled"`
+	ErrorCode          int  `json:"error_code"`
+}
+
+// result to be returned by scan of host
+type MiekgResult struct {
+	Answers     []interface{} `json:"answers"`
+	Additional  []interface{} `json:"additionals"`
+	Authorities []interface{} `json:"authorities"`
+	Protocol    string        `json:"protocol"`
+	Flags       DNSFlags      `json:"flags"`
+}
+
 
 func GetDNSServers(path string) ([]string, error) {
 	c, err := dns.ClientConfigFromFile(path)
@@ -74,7 +105,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 	for genericInput := range input {
 		var res Result
 		var innerRes interface{}
-		var trace []interface{}
+		//var trace []interface{}
 		var status Status
 		var err error
 		l, err := f.MakeLookup()
@@ -111,22 +142,26 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 			}
 			res.Name = rawName
 			res.Class = dns.Class(gc.Class).String()
-			innerRes, trace, status, err = l.DoLookup(lookupName)
+			innerRes, _, status, err = l.DoLookup(lookupName)
 		}
 		res.Timestamp = time.Now().Format(gc.TimeFormat)
 		if status != STATUS_NO_OUTPUT {
-			res.Status = string(status)
-			res.Data = innerRes
-			res.Trace = trace
-			if err != nil {
-				res.Error = err.Error()
+			res, ok := innerRes.(MiekgResult)
+			if ok {
+				answers := res.Answers
+				for i := range(answers) {
+					answer, answerOk := answers[i].(MiekgAnswer)
+					if !answerOk {
+						continue
+					}
+					if answer.Type == "A" {
+						output<-answer.Answer
+						break
+					}
+				}
 			}
-			jsonRes, err := json.Marshal(res)
-			if err != nil {
-				log.Fatal("Unable to marshal JSON result", err)
-			}
-			output <- string(jsonRes)
 		}
+
 		metadata.Names++
 		metadata.Status[status]++
 	}

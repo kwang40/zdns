@@ -20,9 +20,9 @@ import (
 	"sync"
 
 	"github.com/miekg/dns"
-	"github.com/zmap/zdns"
-	"github.com/zmap/zdns/cachehash"
-	"github.com/zmap/zdns/modules/miekg"
+	"../../../zdns"
+	"../../../zdns/cachehash"
+	"../../../zdns/modules/miekg"
 )
 
 // result to be returned by scan of host
@@ -74,7 +74,7 @@ func (s *Lookup) LookupIPs(name string) (CachedAddresses, []interface{}) {
 		if status == zdns.STATUS_NOERROR {
 			cast, _ := res.(miekg.Result)
 			for _, innerRes := range cast.Answers {
-				castInnerRes, ok := innerRes.(miekg.Answer)
+				castInnerRes, ok := innerRes.(zdns.MiekgAnswer)
 				if !ok {
 					continue
 				}
@@ -89,7 +89,7 @@ func (s *Lookup) LookupIPs(name string) (CachedAddresses, []interface{}) {
 		if status == zdns.STATUS_NOERROR {
 			cast, _ := res.(miekg.Result)
 			for _, innerRes := range cast.Answers {
-				castInnerRes, ok := innerRes.(miekg.Answer)
+				castInnerRes, ok := innerRes.(zdns.MiekgAnswer)
 				if !ok {
 					continue
 				}
@@ -116,7 +116,7 @@ func (s *Lookup) DoLookup(name string) (interface{}, []interface{}, zdns.Status,
 	for _, ans := range r.Answers {
 		if mxAns, ok := ans.(miekg.MXAnswer); ok {
 			name = strings.TrimSuffix(mxAns.Answer.Answer, ".")
-			rec := MXRecord{TTL: mxAns.Ttl, Type: mxAns.Type, Class: mxAns.Class, Name: name, Preference: mxAns.Preference}
+			rec := MXRecord{TTL: mxAns.Answer.Ttl, Type: mxAns.Answer.Type, Class: mxAns.Answer.Class, Name: name, Preference: mxAns.Preference}
 			ips, secondTrace := s.LookupIPs(name)
 			rec.IPv4Addresses = ips.IPv4Addresses
 			rec.IPv6Addresses = ips.IPv6Addresses

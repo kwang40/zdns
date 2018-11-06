@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"github.com/zmap/zdns"
-	"github.com/zmap/zdns/modules/miekg"
+	"../../../zdns"
+	"../../../zdns/modules/miekg"
 )
 
 type Result struct {
@@ -41,7 +41,7 @@ func (s *Lookup) DoLookup(name string) (interface{}, []interface{}, zdns.Status,
 	return s.DoTargetedLookup(name, nameServer)
 }
 
-func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16, searchSet map[string][]miekg.Answer, origName string, depth int) ([]string, []interface{}, zdns.Status, error) {
+func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16, searchSet map[string][]zdns.MiekgAnswer, origName string, depth int) ([]string, []interface{}, zdns.Status, error) {
 	// avoid infinite loops
 	if name == origName && depth != 0 {
 		return nil, make([]interface{}, 0), zdns.STATUS_ERROR, errors.New("Infinite redirection loop")
@@ -61,14 +61,14 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 			return nil, trace, status, err
 		}
 		for _, a := range miekgResult.(miekg.Result).Answers {
-			ans, ok := a.(miekg.Answer)
+			ans, ok := a.(zdns.MiekgAnswer)
 			if !ok {
 				continue
 			}
 			searchSet[ans.Name] = append(searchSet[ans.Name], ans)
 		}
 		for _, a := range miekgResult.(miekg.Result).Additional {
-			ans, ok := a.(miekg.Answer)
+			ans, ok := a.(zdns.MiekgAnswer)
 			if !ok {
 				continue
 			}
@@ -101,7 +101,7 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 
 func (s *Lookup) DoTargetedLookup(name string, nameServer string) (interface{}, []interface{}, zdns.Status, error) {
 	res := Result{}
-	searchSet := map[string][]miekg.Answer{}
+	searchSet := map[string][]zdns.MiekgAnswer{}
 	var ipv4 []string
 	var ipv6 []string
 	var ipv4Trace []interface{}
@@ -111,7 +111,7 @@ func (s *Lookup) DoTargetedLookup(name string, nameServer string) (interface{}, 
 		res.IPv4Addresses = make([]string, len(ipv4))
 		copy(res.IPv4Addresses, ipv4)
 	}
-	searchSet = map[string][]miekg.Answer{}
+	searchSet = map[string][]zdns.MiekgAnswer{}
 	if s.Factory.Factory.IPv6Lookup {
 		ipv6, ipv6Trace, _, _ = s.doLookupProtocol(name, nameServer, dns.TypeAAAA, searchSet, name, 0)
 		res.IPv6Addresses = make([]string, len(ipv6))
