@@ -154,7 +154,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 					if !answerOk {
 						continue
 					}
-					if answer.Type == "A" {
+					if answer.Type == "A" || answer.Type == "AAAA" {
 						output<-answer.Answer
 						break
 					}
