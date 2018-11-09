@@ -33,10 +33,11 @@ import (
 	_ "../../zdns/modules/nslookup"
 	_ "../../zdns/modules/spf"
 	_ "../../zdns/iohandlers/file"
+	"bufio"
 )
 
 func main() {
-
+	start := time.Now()
 	var gc zdns.GlobalConf
 	// global flags relevant to every lookup module
 	flags := flag.NewFlagSet("flags", flag.ExitOnError)
@@ -176,4 +177,14 @@ func main() {
 	if err := factory.Finalize(); err != nil {
 		log.Fatal("Factory was unable to finalize:", err.Error())
 	}
+
+	elapsed := time.Since(start)
+	timeCostFile, err := os.Create("timeCost.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer timeCostFile.Close()
+	w := bufio.NewWriter(timeCostFile)
+	w.WriteString(elapsed.String())
+	w.Flush()
 }
