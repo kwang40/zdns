@@ -95,7 +95,7 @@ func makeName(name string, prefix string) (string, bool) {
 	}
 }
 
-func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
+func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, outStdChan chan<- string, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
 	f, err := (*g).MakeRoutineFactory(threadID)
 	if err != nil {
 		log.Fatal("Unable to create new routine factory", err.Error())
@@ -105,7 +105,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 	for genericInput := range input {
 		var res Result
 		var innerRes interface{}
-		//var trace []interface{}
+		var trace []interface{}
 		var status Status
 		var err error
 		l, err := f.MakeLookup()
@@ -142,10 +142,21 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 			}
 			res.Name = rawName
 			res.Class = dns.Class(gc.Class).String()
-			innerRes, _, status, err = l.DoLookup(lookupName)
+			innerRes, trace, status, err = l.DoLookup(lookupName)
 		}
 		res.Timestamp = time.Now().Format(gc.TimeFormat)
 		if status != STATUS_NO_OUTPUT {
+			res.Status = string(status)
+			res.Data = innerRes
+			res.Trace = trace
+			if err != nil {
+				res.Error = err.Error()
+			}
+			jsonRes, err := json.Marshal(res)
+			if err != nil {
+				log.Fatal("Unable to marshal JSON result", err)
+			}
+			output <- string(jsonRes)
 			res, ok := innerRes.(MiekgResult)
 			if ok {
 				answers := res.Answers
@@ -154,8 +165,8 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 					if !answerOk {
 						continue
 					}
-					if answer.Type == gc.Module {
-						output<-answer.Answer
+					if answer.Type == gc.Module || gc.Module == "ANY" {
+						outStdChan<-answer.Answer
 						break
 					}
 				}
@@ -190,8 +201,10 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	// output and metadata threads have completed
 	inChan := make(chan interface{})
 	outChan := make(chan string)
+	outStdChan := make(chan string)
 	metaChan := make(chan routineMetadata, c.Threads)
 	var routineWG sync.WaitGroup
+	var routineWGstdOut sync.WaitGroup
 
 	inHandler := GetInputHandler(c.InputHandler)
 	outHandler := GetOutputHandler(c.OutputHandler)
@@ -200,18 +213,21 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 
 	// Use handlers to populate the input and output/results channel
 	go inHandler.FeedChannel(inChan, &routineWG, (*g).ZonefileInput())
-	go outHandler.WriteResults(outChan, &routineWG)
+	go outHandler.WriteResults(outChan, &routineWG, false)
+	go outHandler.WriteResults(outStdChan, &routineWGstdOut, true)
 	routineWG.Add(2)
+	routineWGstdOut.Add(2)
 
 	// create pool of worker goroutines
 	var lookupWG sync.WaitGroup
 	lookupWG.Add(c.Threads)
 	startTime := time.Now().Format(c.TimeFormat)
 	for i := 0; i < c.Threads; i++ {
-		go doLookup(g, c, inChan, outChan, metaChan, &lookupWG, i)
+		go doLookup(g, c, inChan, outChan, outStdChan, metaChan, &lookupWG, i)
 	}
 	lookupWG.Wait()
 	close(outChan)
+	close(outStdChan)
 	close(metaChan)
 	routineWG.Wait()
 	if c.MetadataFilePath != "" {

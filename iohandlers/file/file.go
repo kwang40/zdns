@@ -57,11 +57,11 @@ func (h *OutputHandler) Initialize(conf *zdns.GlobalConf) {
 	h.filepath = conf.OutputFilePath
 }
 
-func (h *OutputHandler) WriteResults(results <-chan string, wg *sync.WaitGroup) error {
+func (h *OutputHandler) WriteResults(results <-chan string, wg *sync.WaitGroup, stdOutput bool) error {
 	defer (*wg).Done()
 
 	var f *os.File
-	if h.filepath == "" || h.filepath == "-" {
+	if stdOutput || h.filepath == "" || h.filepath == "-" {
 		f = os.Stdout
 	} else {
 		var err error
@@ -76,6 +76,7 @@ func (h *OutputHandler) WriteResults(results <-chan string, wg *sync.WaitGroup) 
 	}
 	return nil
 }
+
 
 // register handlers
 func init() {

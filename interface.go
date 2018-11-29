@@ -103,7 +103,7 @@ type OutputHandler interface {
 	// give the OutputHandler access to the global config in case it needs any of the settings
 	Initialize(conf *GlobalConf)
 	// takes a channel (results) to write the query results to, and the WaitGroup managing the handlers
-	WriteResults(results <-chan string, wg *sync.WaitGroup) error
+	WriteResults(results <-chan string, wg *sync.WaitGroup, stdOutput bool) error
 }
 
 type BaseGlobalLookupFactory struct {
