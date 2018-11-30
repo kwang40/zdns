@@ -32,6 +32,7 @@ import (
 	_ "../../zdns/modules/spf"
 	_ "../../zdns/iohandlers/file"
 	"bufio"
+	"fmt"
 )
 
 func main() {
@@ -75,7 +76,7 @@ func main() {
 	}
 	factory.AddFlags(flags)
 	flags.Parse(os.Args[2:])
-	
+
 	stdOutModules := strings.Split(*stdOutModulesStr, ",")
 	if gc.StdOutModules == nil {
 		gc.StdOutModules = make(map[string]bool)
@@ -196,4 +197,5 @@ func main() {
 	w := bufio.NewWriter(timeCostFile)
 	w.WriteString(elapsed.String())
 	w.Flush()
+	fmt.Println("Finished")
 }
