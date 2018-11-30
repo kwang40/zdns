@@ -45,6 +45,7 @@ type GlobalConf struct {
 
 	Module string
 	Class  uint16
+	StdOutModules	map[string]bool
 }
 
 type Metadata struct {

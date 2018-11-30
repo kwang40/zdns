@@ -157,20 +157,23 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 				log.Fatal("Unable to marshal JSON result", err)
 			}
 			output <- string(jsonRes)
-			res, ok := innerRes.(MiekgResult)
-			if ok {
-				answers := res.Answers
-				for i := range(answers) {
-					answer, answerOk := answers[i].(MiekgAnswer)
-					if !answerOk {
-						continue
-					}
-					if answer.Type == gc.Module || gc.Module == "ANY" {
-						outStdChan<-answer.Answer
-						break
+			if len(gc.StdOutModules) != 0 {
+				res, ok := innerRes.(MiekgResult)
+				if ok {
+					answers := res.Answers
+					for i := range(answers) {
+						answer, answerOk := answers[i].(MiekgAnswer)
+						if !answerOk {
+							continue
+						}
+						if gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"] {
+							outStdChan<-answer.Answer
+							break
+						}
 					}
 				}
 			}
+
 		}
 
 		metadata.Names++

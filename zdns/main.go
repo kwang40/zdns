@@ -25,10 +25,8 @@ import (
 	"../../zdns"
 	_ "../../zdns/modules/alookup"
 	_ "../../zdns/modules/miekg"
-	_ "../../zdns/modules/alookup"
 	_ "../../zdns/modules/axfr"
 	_ "../../zdns/modules/dmarc"
-	_ "../../zdns/modules/miekg"
 	_ "../../zdns/modules/mxlookup"
 	_ "../../zdns/modules/nslookup"
 	_ "../../zdns/modules/spf"
@@ -63,11 +61,13 @@ func main() {
 	iterationTimeout := flags.Int("iteration-timeout", 4, "timeout for resolving a single iteration in an iterative query")
 	class_string := flags.String("class", "INET", "DNS class to query (INET, CSNET, CHAOS, HESIOD, NONE, ANY (default INET)")
 	nanoSeconds := flags.Bool("nanoseconds", false, "Use nanosecond resolution timestamps")
+	stdOutModulesStr := flags.String("std-out-modules","", "Output results to stdout instead of saving to file, separate by comma")
 	// allow module to initialize and add its own flags before we parse
 	if len(os.Args) < 2 {
 		log.Fatal("No lookup module specified. Valid modules: ", zdns.ValidlookupsString())
 	}
 	gc.Module = strings.ToUpper(os.Args[1])
+
 	factory := zdns.GetLookup(gc.Module)
 	if factory == nil {
 		flags.Parse(os.Args[1:])
@@ -75,6 +75,15 @@ func main() {
 	}
 	factory.AddFlags(flags)
 	flags.Parse(os.Args[2:])
+	
+	stdOutModules := strings.Split(*stdOutModulesStr, ",")
+	if gc.StdOutModules == nil {
+		gc.StdOutModules = make(map[string]bool)
+	}
+	for _,module := range stdOutModules {
+		gc.StdOutModules[strings.ToUpper(module)] = true
+	}
+
 	// Do some basic sanity checking
 	// setup global logging
 	if gc.LogFilePath != "" {
