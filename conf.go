@@ -38,14 +38,17 @@ type GlobalConf struct {
 
 	InputFilePath    string
 	OutputFilePath   string
+	RedisServerUrl   string
+	RedisServerPass  string
+	RedisServerDB    int
 	LogFilePath      string
 	MetadataFilePath string
 
 	NamePrefix string
 
-	Module string
-	Class  uint16
-	StdOutModules	map[string]bool
+	Module        string
+	Class         uint16
+	StdOutModules map[string]bool
 }
 
 type Metadata struct {
