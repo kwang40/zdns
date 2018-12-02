@@ -16,6 +16,7 @@ package zdns
 
 import (
 	"encoding/json"
+	"github.com/kwang40/zdns/iohandlers/redis"
 	"os"
 	"strconv"
 	"strings"
@@ -95,7 +96,7 @@ func makeName(name string, prefix string) (string, bool) {
 	}
 }
 
-func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, outStdChan chan<- string, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
+func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, outStdChan chan<- string, resultChannel chan<- Result, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
 	f, err := (*g).MakeRoutineFactory(threadID)
 	if err != nil {
 		log.Fatal("Unable to create new routine factory", err.Error())
@@ -152,6 +153,8 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 			if err != nil {
 				res.Error = err.Error()
 			}
+
+			resultChannel <- res
 			jsonRes, err := json.Marshal(res)
 			if err != nil {
 				log.Fatal("Unable to marshal JSON result", err)
@@ -205,17 +208,25 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	inChan := make(chan interface{})
 	outChan := make(chan string)
 	outStdChan := make(chan string)
+	outRedisChan := make(chan Result)
 	metaChan := make(chan routineMetadata, c.Threads)
 	var routineWG sync.WaitGroup
+	var routineWGstdOut sync.WaitGroup
+	var routineRedisWG sync.WaitGroup
 
 	inHandler := GetInputHandler(c.InputHandler)
 	outHandler := GetOutputHandler(c.OutputHandler)
+	redisHandler := new(redis.RedisOutputHandler)
 	inHandler.Initialize(c)
 	outHandler.Initialize(c)
 
 	// Use handlers to populate the input and output/results channel
 	go inHandler.FeedChannel(inChan, &routineWG, (*g).ZonefileInput())
 	go outHandler.WriteResults(outChan, &routineWG, false)
+	go outHandler.WriteResults(outStdChan, &routineWGstdOut, true)
+	if c.RedisServerUrl != "" {
+		go redisHandler.WriteResults(outRedisChan, &routineRedisWG)
+	}
 	routineWG.Add(2)
 	if len(c.StdOutModules) != 0 {
 		go outHandler.WriteResults(outStdChan, &routineWG, true)
@@ -227,11 +238,12 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	lookupWG.Add(c.Threads)
 	startTime := time.Now().Format(c.TimeFormat)
 	for i := 0; i < c.Threads; i++ {
-		go doLookup(g, c, inChan, outChan, outStdChan, metaChan, &lookupWG, i)
+		go doLookup(g, c, inChan, outChan, outStdChan, outRedisChan, metaChan, &lookupWG, i)
 	}
 	lookupWG.Wait()
 	close(outChan)
 	close(outStdChan)
+	close(outRedisChan)
 	close(metaChan)
 	routineWG.Wait()
 	if c.MetadataFilePath != "" {

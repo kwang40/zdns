@@ -120,7 +120,7 @@ func ParseAnswer(ans dns.RR) interface{} {
 	if a, ok := ans.(*dns.A); ok {
 		retv = zdns.MiekgAnswer{
 			Ttl:     a.Hdr.Ttl,
-			Type:    dns.Type(a.Hdr.Rrtype).String(),
+			Type:    ,
 			RrType:  a.Hdr.Rrtype,
 			Class:   dns.Class(a.Hdr.Class).String(),
 			RrClass: a.Hdr.Class,
