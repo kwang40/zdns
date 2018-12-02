@@ -10,15 +10,15 @@ import (
 	"../../../zdns"
 )
 
-type InputHandler struct {
+type FileInputHandler struct {
 	filepath string
 }
 
-func (h *InputHandler) Initialize(conf *zdns.GlobalConf) {
+func (h *FileInputHandler) Initialize(conf *zdns.GlobalConf) {
 	h.filepath = conf.InputFilePath
 }
 
-func (h *InputHandler) FeedChannel(in chan<- interface{}, wg *sync.WaitGroup, zonefileInput bool) error {
+func (h *FileInputHandler) FeedChannel(in chan<- interface{}, wg *sync.WaitGroup, zonefileInput bool) error {
 	defer close(in)
 	defer (*wg).Done()
 
@@ -49,15 +49,15 @@ func (h *InputHandler) FeedChannel(in chan<- interface{}, wg *sync.WaitGroup, zo
 	return nil
 }
 
-type OutputHandler struct {
+type FileOutputHandler struct {
 	filepath string
 }
 
-func (h *OutputHandler) Initialize(conf *zdns.GlobalConf) {
+func (h *FileOutputHandler) Initialize(conf *zdns.GlobalConf) {
 	h.filepath = conf.OutputFilePath
 }
 
-func (h *OutputHandler) WriteResults(results <-chan string, wg *sync.WaitGroup, stdOutput bool) error {
+func (h *FileOutputHandler) WriteResults(results <-chan string, wg *sync.WaitGroup, stdOutput bool) error {
 	defer (*wg).Done()
 
 	var f *os.File
@@ -85,9 +85,9 @@ func (h *OutputHandler) WriteResults(results <-chan string, wg *sync.WaitGroup, 
 
 // register handlers
 func init() {
-	in := new(InputHandler)
+	in := new(FileInputHandler)
 	zdns.RegisterInputHandler("file", in)
 
-	out := new(OutputHandler)
+	out := new(FileOutputHandler)
 	zdns.RegisterOutputHandler("file", out)
 }
