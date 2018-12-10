@@ -72,7 +72,12 @@ func (h *OutputHandler) WriteResults(results <-chan string, wg *sync.WaitGroup, 
 		defer f.Close()
 	}
 	for n := range results {
-		f.WriteString(n + "\n")
+		if _, err := f.WriteString(n + "\n"); err != nil {
+			if stdOutput {
+				log.Fatal("Problem at stdout channel")
+			}
+			log.Fatal("Problem writing", n, err.Error())
+		}
 	}
 	return nil
 }
