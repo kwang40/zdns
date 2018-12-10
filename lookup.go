@@ -207,7 +207,6 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	outStdChan := make(chan string)
 	metaChan := make(chan routineMetadata, c.Threads)
 	var routineWG sync.WaitGroup
-	var routineWGstdOut sync.WaitGroup
 
 	inHandler := GetInputHandler(c.InputHandler)
 	outHandler := GetOutputHandler(c.OutputHandler)
@@ -217,9 +216,11 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	// Use handlers to populate the input and output/results channel
 	go inHandler.FeedChannel(inChan, &routineWG, (*g).ZonefileInput())
 	go outHandler.WriteResults(outChan, &routineWG, false)
-	go outHandler.WriteResults(outStdChan, &routineWGstdOut, true)
 	routineWG.Add(2)
-	routineWGstdOut.Add(2)
+	if len(c.StdOutModules) != 0 {
+		go outHandler.WriteResults(outStdChan, &routineWG, true)
+		routineWG.Add(1)
+	}
 
 	// create pool of worker goroutines
 	var lookupWG sync.WaitGroup
