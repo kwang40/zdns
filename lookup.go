@@ -146,6 +146,24 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 		}
 		res.Timestamp = time.Now().Format(gc.TimeFormat)
 		if status != STATUS_NO_OUTPUT {
+			tmpAnswer := ""
+			if len(gc.StdOutModules) != 0 {
+				res, ok := innerRes.(MiekgResult)
+				if ok {
+					answers := res.Answers
+					for i := range(answers) {
+						answer, answerOk := answers[i].(MiekgAnswer)
+						if !answerOk {
+							continue
+						}
+						if gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"] {
+							tmpAnswer = answer.Answer
+							//outStdChan<-answer.Answer
+							break
+						}
+					}
+				}
+			}
 			res.Status = string(status)
 			res.Data = innerRes
 			res.Trace = trace
@@ -167,7 +185,12 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 							continue
 						}
 						if gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"] {
-							outStdChan<-answer.Answer
+							if answer.Answer != tmpAnswer {
+								outStdChan<-tmpAnswer
+								outStdChan<-answer.Answer
+								outStdChan<-string(jsonRes)
+							}
+							//outStdChan<-answer.Answer
 							break
 						}
 					}
