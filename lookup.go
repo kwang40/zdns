@@ -232,6 +232,8 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 		go outHandler.WriteResults(outStdChan, &routineWG, true)
 		routineWG.Add(1)
 	}
+	routineWGstdOut.Add(1)
+	routineRedisWG.Add(1)
 
 	// create pool of worker goroutines
 	var lookupWG sync.WaitGroup
@@ -246,6 +248,8 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	close(outRedisChan)
 	close(metaChan)
 	routineWG.Wait()
+	routineWGstdOut.Wait()
+	routineRedisWG.Wait()
 	if c.MetadataFilePath != "" {
 		// we're done processing data. aggregate all the data from individual routines
 		metaData := aggregateMetadata(metaChan)
