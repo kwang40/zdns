@@ -154,7 +154,9 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 				res.Error = err.Error()
 			}
 
-			resultChannel <- res
+			if resultChannel != nil {
+				resultChannel <- res
+			}
 			jsonRes, err := json.Marshal(res)
 			if err != nil {
 				log.Fatal("Unable to marshal JSON result", err)
@@ -205,36 +207,39 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	//	- process until inChan closes, then wg.done()
 	// Once we processing threads have all finished, wait until the
 	// output and metadata threads have completed
+	var outRedisChan chan Result
 	inChan := make(chan interface{})
 	outChan := make(chan string)
 	outStdChan := make(chan string)
-	outRedisChan := make(chan Result)
 	metaChan := make(chan routineMetadata, c.Threads)
 	var routineWG sync.WaitGroup
-	var routineWGstdOut sync.WaitGroup
-	var routineRedisWG sync.WaitGroup
 
 	inHandler := GetInputHandler(c.InputHandler)
 	outHandler := GetOutputHandler(c.OutputHandler)
-	redisHandler := new(RedisOutputHandler)
 	inHandler.Initialize(c)
 	outHandler.Initialize(c)
-	redisHandler.Initialize(c)
 
 	// Use handlers to populate the input and output/results channel
+	routineWG.Add(1)
 	go inHandler.FeedChannel(inChan, &routineWG, (*g).ZonefileInput())
+	routineWG.Add(1)
 	go outHandler.WriteResults(outChan, &routineWG, false)
-	go outHandler.WriteResults(outStdChan, &routineWGstdOut, true)
+	routineWG.Add(1)
+	go outHandler.WriteResults(outStdChan, &routineWG, true)
 	if c.RedisServerUrl != "" {
-		go redisHandler.WriteResults(outRedisChan, &routineRedisWG)
-		routineRedisWG.Add(1)
+		outRedisChan = make(chan Result)
+		redisHandler := new(RedisOutputHandler)
+		redisHandler.Initialize(c)
+		defer redisHandler.Close()
+		routineWG.Add(1)
+		go redisHandler.WriteResults(outRedisChan, &routineWG)
 	}
+
 	routineWG.Add(2)
 	if len(c.StdOutModules) != 0 {
 		go outHandler.WriteResults(outStdChan, &routineWG, true)
 		routineWG.Add(1)
 	}
-	routineWGstdOut.Add(1)
 
 	// create pool of worker goroutines
 	var lookupWG sync.WaitGroup
@@ -246,11 +251,11 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	lookupWG.Wait()
 	close(outChan)
 	close(outStdChan)
-	close(outRedisChan)
+	if outRedisChan != nil {
+		close(outRedisChan)
+	}
 	close(metaChan)
 	routineWG.Wait()
-	routineWGstdOut.Wait()
-	routineRedisWG.Wait()
 	if c.MetadataFilePath != "" {
 		// we're done processing data. aggregate all the data from individual routines
 		metaData := aggregateMetadata(metaChan)
@@ -298,6 +303,10 @@ func (h *RedisOutputHandler) Initialize(conf *GlobalConf) {
 	})
 }
 
+func (h *RedisOutputHandler) Close() {
+	h.client.Close()
+}
+
 func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGroup) error {
 	defer (*wg).Done()
 
@@ -339,7 +348,10 @@ func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGr
 				}
 			}
 
-			value = append(value, domain)
+			if !contains(value, domain) {
+				value = append(value, domain)
+			}
+
 			jsonBytes, err := json.Marshal(value)
 			if err != nil {
 				log.Error("error marshalling redis:", err)
@@ -354,3 +366,11 @@ func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGr
 	return nil
 }
 
+func contains(arr []string, str string) bool {
+	for _, val := range arr {
+		if str == val {
+			return true
+		}
+	}
+	return false
+}

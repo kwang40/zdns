@@ -63,7 +63,6 @@ func (h *FileOutputHandler) WriteResults(results <-chan string, wg *sync.WaitGro
 	var f *os.File
 	if stdOutput || h.filepath == "" || h.filepath == "-" {
 		f = os.Stdout
-		defer f.Close()
 	} else {
 		var err error
 		f, err = os.OpenFile(h.filepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
