@@ -224,8 +224,12 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	go inHandler.FeedChannel(inChan, &routineWG, (*g).ZonefileInput())
 	routineWG.Add(1)
 	go outHandler.WriteResults(outChan, &routineWG, false)
-	routineWG.Add(1)
-	go outHandler.WriteResults(outStdChan, &routineWG, true)
+
+	if len(c.StdOutModules) != 0 {
+		routineWG.Add(1)
+		go outHandler.WriteResults(outStdChan, &routineWG, true)
+	}
+
 	if c.RedisServerUrl != "" {
 		outRedisChan = make(chan Result)
 		redisHandler := new(RedisOutputHandler)
@@ -235,11 +239,6 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 		go redisHandler.WriteResults(outRedisChan, &routineWG)
 	}
 
-	routineWG.Add(2)
-	if len(c.StdOutModules) != 0 {
-		go outHandler.WriteResults(outStdChan, &routineWG, true)
-		routineWG.Add(1)
-	}
 
 	// create pool of worker goroutines
 	var lookupWG sync.WaitGroup
