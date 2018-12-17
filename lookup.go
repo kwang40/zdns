@@ -219,6 +219,7 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	redisHandler := new(RedisOutputHandler)
 	inHandler.Initialize(c)
 	outHandler.Initialize(c)
+	redisHandler.Initialize(c)
 
 	// Use handlers to populate the input and output/results channel
 	go inHandler.FeedChannel(inChan, &routineWG, (*g).ZonefileInput())
@@ -226,6 +227,7 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	go outHandler.WriteResults(outStdChan, &routineWGstdOut, true)
 	if c.RedisServerUrl != "" {
 		go redisHandler.WriteResults(outRedisChan, &routineRedisWG)
+		routineRedisWG.Add(1)
 	}
 	routineWG.Add(2)
 	if len(c.StdOutModules) != 0 {
@@ -233,7 +235,6 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 		routineWG.Add(1)
 	}
 	routineWGstdOut.Add(1)
-	routineRedisWG.Add(1)
 
 	// create pool of worker goroutines
 	var lookupWG sync.WaitGroup
@@ -289,7 +290,7 @@ type RedisOutputHandler struct {
 	client *redis.Client
 }
 
-func (h *RedisOutputHandler) Initialize(conf GlobalConf) {
+func (h *RedisOutputHandler) Initialize(conf *GlobalConf) {
 	h.client = redis.NewClient(&redis.Options{
 		Addr:     conf.RedisServerUrl,
 		Password: conf.RedisServerPass,
