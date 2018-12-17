@@ -29,6 +29,7 @@ import (
 	"github.com/go-redis/redis"
 	"log"
 	"os"
+	"strings"
 )
 
 var (
@@ -71,7 +72,8 @@ func main() {
 		}
 
 		for _, val := range value {
-			w.WriteString(val + "\n")
+			outputStr := []string{ipAddr,val + "\n"}
+			w.WriteString(strings.Join(outputStr, ","))
 		}
 	}
 	w.Flush()
