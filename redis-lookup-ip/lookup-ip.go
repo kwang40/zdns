@@ -58,21 +58,36 @@ func main() {
 	for s.Scan() {
 		ipAddr := s.Text()
 
-		var value []string
-		redisValue, err := client.Get(ipAddr).Result()
+		var domains []string
+		var urls []string
+		redisDomains, err := client.Get(ipAddr).Result()
 		if err == redis.Nil { // no key found
-			value = make([]string, 0)
+			domains = make([]string, 0)
 		} else if err != nil {
 			log.Fatal("unable to get key:", err)
 		} else {
-			err = json.Unmarshal([]byte(redisValue), &value)
+			err = json.Unmarshal([]byte(redisDomains), &domains)
 			if err != nil {
 				log.Fatal("error unmarshalling redis string:", err)
 			}
 		}
 
-		for _, val := range value {
-			outputStr := []string{ipAddr,val + "\n"}
+		for _, domain := range domains {
+			redisUrls, err := client.Get(domain).Result()
+			if err == redis.Nil { // no key found
+				domains = make([]string, 0)
+			} else if err != nil {
+				log.Fatal("unable to get key:", err)
+			} else {
+				err = json.Unmarshal([]byte(redisUrls), &urls)
+				if err != nil {
+					log.Fatal("error unmarshalling redis string:", err)
+				}
+			}
+		}
+
+		for _, u := range urls {
+			outputStr := []string{ipAddr, u + "\n"}
 			w.WriteString(strings.Join(outputStr, ","))
 		}
 	}
