@@ -16,6 +16,7 @@ package zdns
 
 import (
 	"encoding/json"
+	"github.com/go-redis/redis"
 	"os"
 	"strconv"
 	"strings"
@@ -95,7 +96,7 @@ func makeName(name string, prefix string) (string, bool) {
 	}
 }
 
-func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, outStdChan chan<- string, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
+func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, outStdChan chan<- string, resultChannel chan<- Result, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
 	f, err := (*g).MakeRoutineFactory(threadID)
 	if err != nil {
 		log.Fatal("Unable to create new routine factory", err.Error())
@@ -152,6 +153,10 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 			if err != nil {
 				res.Error = err.Error()
 			}
+
+			if resultChannel != nil {
+				resultChannel <- res
+			}
 			jsonRes, err := json.Marshal(res)
 			if err != nil {
 				log.Fatal("Unable to marshal JSON result", err)
@@ -202,6 +207,7 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	//	- process until inChan closes, then wg.done()
 	// Once we processing threads have all finished, wait until the
 	// output and metadata threads have completed
+	var outRedisChan chan Result
 	inChan := make(chan interface{})
 	outChan := make(chan string)
 	outStdChan := make(chan string)
@@ -214,24 +220,39 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	outHandler.Initialize(c)
 
 	// Use handlers to populate the input and output/results channel
+	routineWG.Add(1)
 	go inHandler.FeedChannel(inChan, &routineWG, (*g).ZonefileInput())
+	routineWG.Add(1)
 	go outHandler.WriteResults(outChan, &routineWG, false)
-	routineWG.Add(2)
+
 	if len(c.StdOutModules) != 0 {
-		go outHandler.WriteResults(outStdChan, &routineWG, true)
 		routineWG.Add(1)
+		go outHandler.WriteResults(outStdChan, &routineWG, true)
 	}
+
+	if c.RedisServerUrl != "" {
+		outRedisChan = make(chan Result)
+		redisHandler := new(RedisOutputHandler)
+		redisHandler.Initialize(c)
+		defer redisHandler.Close()
+		routineWG.Add(1)
+		go redisHandler.WriteResults(outRedisChan, &routineWG)
+	}
+
 
 	// create pool of worker goroutines
 	var lookupWG sync.WaitGroup
 	lookupWG.Add(c.Threads)
 	startTime := time.Now().Format(c.TimeFormat)
 	for i := 0; i < c.Threads; i++ {
-		go doLookup(g, c, inChan, outChan, outStdChan, metaChan, &lookupWG, i)
+		go doLookup(g, c, inChan, outChan, outStdChan, outRedisChan, metaChan, &lookupWG, i)
 	}
 	lookupWG.Wait()
 	close(outChan)
 	close(outStdChan)
+	if outRedisChan != nil {
+		close(outRedisChan)
+	}
 	close(metaChan)
 	routineWG.Wait()
 	if c.MetadataFilePath != "" {
@@ -266,4 +287,89 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 		f.WriteString(string(j))
 	}
 	return nil
+}
+
+
+type RedisOutputHandler struct {
+	client *redis.Client
+}
+
+func (h *RedisOutputHandler) Initialize(conf *GlobalConf) {
+	h.client = redis.NewClient(&redis.Options{
+		Addr:     conf.RedisServerUrl,
+		Password: conf.RedisServerPass,
+		DB:       conf.RedisServerDB,
+	})
+}
+
+func (h *RedisOutputHandler) Close() {
+	h.client.Close()
+}
+
+func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGroup) error {
+	defer (*wg).Done()
+
+	for r := range results {
+		res, ok := r.Data.(MiekgResult)
+		if !ok {
+			o, err := json.Marshal(res)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Warn("unable to parse result: ", string(o))
+		}
+
+		for _, a := range res.Answers {
+			var key, domain string
+			if miekgAnswer, ok := a.(MiekgAnswer); ok {
+				if miekgAnswer.Type == dns.TypeToString[dns.TypeA] || miekgAnswer.Type == dns.TypeToString[dns.TypeAAAA] {
+					key = miekgAnswer.Answer
+					domain = miekgAnswer.Name
+				}
+			} else {
+			//} else if mxAnswer, ok := a.(miekg.MXAnswer); ok {
+			//	key = mxAnswer.Answer.Answer
+			//	domain = mxAnswer.Answer.Name
+			//} else {
+				log.Warn("unimplemented answer type (not MiekgAnswer or MXAnswer")
+			}
+
+			var value []string
+			redisValue, err := h.client.Get(key).Result()
+			if err == redis.Nil { // no key found
+				value = make([]string, 0)
+			} else if err != nil {
+				log.Fatal("unable to get key:", err)
+			} else {
+				err = json.Unmarshal([]byte(redisValue), &value)
+				if err != nil {
+					log.Error("error unmarshalling redis string:", err)
+				}
+			}
+
+			if !contains(value, domain) {
+				value = append(value, domain)
+			}
+
+			jsonBytes, err := json.Marshal(value)
+			if err != nil {
+				log.Error("error marshalling redis:", err)
+			}
+			err = h.client.Set(key, string(jsonBytes[:]), 0).Err()
+			if err != nil {
+				log.Error("unable to set redis key:", err)
+			}
+		}
+
+	}
+	return nil
+}
+
+func contains(arr []string, str string) bool {
+	for _, val := range arr {
+		if str == val {
+			return true
+		}
+	}
+	return false
 }
