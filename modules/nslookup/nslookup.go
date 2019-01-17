@@ -19,8 +19,8 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"../../../zdns"
-	"../../../zdns/modules/miekg"
+	"github.com/kwang40/zdns"
+	"github.com/kwang40/zdns/modules/miekg"
 )
 
 // result to be returned by scan of host

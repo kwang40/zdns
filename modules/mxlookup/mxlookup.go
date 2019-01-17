@@ -20,9 +20,9 @@ import (
 	"sync"
 
 	"github.com/miekg/dns"
-	"../../../zdns"
-	"../../../zdns/cachehash"
-	"../../../zdns/modules/miekg"
+	"github.com/kwang40/zdns"
+	"github.com/kwang40/zdns/cachehash"
+	"github.com/kwang40/zdns/modules/miekg"
 )
 
 // result to be returned by scan of host
