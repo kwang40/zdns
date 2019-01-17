@@ -40,7 +40,7 @@ var (
 
 func main() {
 	flags := flag.NewFlagSet("flags", flag.ExitOnError)
-	flags.StringVar(&redisServerUrl, "redis-url", "", "URL for redis server that stores one-to-many IP:domain mapping")
+	flags.StringVar(&redisServerUrl, "redis-url", "127.0.0.1:6379", "URL for redis server that stores one-to-many IP:domain mapping")
 	flags.StringVar(&redisServerPass, "redis-pass", "", "Password for redis server")
 	flags.IntVar(&redisServerDB, "redis-db", 0, "DB for redis server")
 
