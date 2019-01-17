@@ -37,12 +37,14 @@ var (
 	redisServerUrl string
 	redisServerPass string
 	redisServerDB int
+	redisFlushDB bool
 )
 
 func main() {
 	flags := flag.NewFlagSet("flags", flag.ExitOnError)
 	flags.StringVar(&redisServerUrl, "redis-url", "127.0.0.1:6379", "URL for redis server that stores one-to-many IP:domain mapping")
 	flags.StringVar(&redisServerPass, "redis-pass", "", "Password for redis server")
+	flags.BoolVar(&redisFlushDB, "redis-flush-db", false, "Flush redis database")
 	flags.IntVar(&redisServerDB, "redis-db", 0, "DB for redis server")
 
 	flags.Parse(os.Args[1:])
@@ -53,6 +55,10 @@ func main() {
 		DB:       redisServerDB,
 	})
 
+
+	if redisFlushDB {
+		client.FlushDB()
+	}
 
 	s := bufio.NewScanner(os.Stdin)
 	w := bufio.NewWriter(os.Stdout)
