@@ -15,14 +15,14 @@
 package main
 
 import (
-	_ "../../zdns/iohandlers/file"
-	_ "../../zdns/modules/alookup"
-	_ "../../zdns/modules/axfr"
-	_ "../../zdns/modules/dmarc"
-	_ "../../zdns/modules/miekg"
-	_ "../../zdns/modules/mxlookup"
-	_ "../../zdns/modules/nslookup"
-	_ "../../zdns/modules/spf"
+	_ "github.com/kwang40/zdns/iohandlers/file"
+	_ "github.com/kwang40/zdns/modules/alookup"
+	_ "github.com/kwang40/zdns/modules/axfr"
+	_ "github.com/kwang40/zdns/modules/dmarc"
+	_ "github.com/kwang40/zdns/modules/miekg"
+	_ "github.com/kwang40/zdns/modules/mxlookup"
+	_ "github.com/kwang40/zdns/modules/nslookup"
+	_ "github.com/kwang40/zdns/modules/spf"
 	"bufio"
 	"encoding/json"
 	"flag"
