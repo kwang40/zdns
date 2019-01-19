@@ -326,13 +326,13 @@ func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGr
 					key = miekgAnswer.Answer
 					domain = miekgAnswer.Name
 				}
-			} else {
+			} //else {
 			//} else if mxAnswer, ok := a.(miekg.MXAnswer); ok {
 			//	key = mxAnswer.Answer.Answer
 			//	domain = mxAnswer.Answer.Name
 			//} else {
-				log.Warn("unimplemented answer type (not MiekgAnswer or MXAnswer")
-			}
+			//	log.Warn("unimplemented answer type (not MiekgAnswer or MXAnswer)")
+			//}
 
 			var value []string
 			redisValue, err := h.client.Get(key).Result()
