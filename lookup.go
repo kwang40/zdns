@@ -25,6 +25,7 @@ import (
 
 	"github.com/miekg/dns"
 	log "github.com/sirupsen/logrus"
+	"fmt"
 )
 
 type routineMetadata struct {
@@ -162,6 +163,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 				log.Fatal("Unable to marshal JSON result", err)
 			}
 			output <- string(jsonRes)
+			fmt.Println("Json result:", string(jsonRes))
 			if len(gc.StdOutModules) != 0 {
 				res, ok := innerRes.(MiekgResult)
 				if ok {
@@ -169,13 +171,17 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 					for i := range(answers) {
 						answer, answerOk := answers[i].(MiekgAnswer)
 						if !answerOk {
+							fmt.Println("Unresolvebale to MiekgAnswer")
 							continue
 						}
 						if (gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"]) && len(answer.Answer) > 0 && answer.Answer != "<nil>" {
 							outStdChan<-answer.Answer
 							break
 						}
+						fmt.Println("no valid answer")
 					}
+				} else {
+					fmt.Println("Unresolvebale to MiekgResult")
 				}
 			}
 
@@ -331,7 +337,7 @@ func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGr
 			//	key = mxAnswer.Answer.Answer
 			//	domain = mxAnswer.Answer.Name
 			//} else {
-			//	log.Warn("unimplemented answer type (not MiekgAnswer or MXAnswer)")
+			//	log.Warn("unimplemented answer type (not MiekgAnswer or MXAnswer)r")
 			//}
 
 			var value []string
