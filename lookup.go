@@ -168,6 +168,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 				res, ok := innerRes.(MiekgResult)
 				if ok {
 					answers := res.Answers
+					found := false
 					for i := range(answers) {
 						answer, answerOk := answers[i].(MiekgAnswer)
 						if !answerOk {
@@ -176,10 +177,13 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 						}
 						if (gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"]) && len(answer.Answer) > 0 && answer.Answer != "<nil>" {
 							//outStdChan<-answer.Answer
+							found = true
 							break
 						}
 					}
-					fmt.Println("no valid answer", string(jsonRes))
+					if !found {
+						fmt.Println("no valid answer", string(jsonRes))
+					}
 				} else {
 					fmt.Println("Unresolvebale to MiekgResult", string(jsonRes))
 				}
