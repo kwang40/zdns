@@ -171,17 +171,17 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 					for i := range(answers) {
 						answer, answerOk := answers[i].(MiekgAnswer)
 						if !answerOk {
-							//fmt.Println("Unresolvebale to MiekgAnswer")
+							fmt.Println("Unresolvebale to MiekgAnswer", string(jsonRes))
 							continue
 						}
 						if (gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"]) && len(answer.Answer) > 0 && answer.Answer != "<nil>" {
-							outStdChan<-answer.Answer
+							//outStdChan<-answer.Answer
 							break
 						}
-						fmt.Println("no valid answer", string(jsonRes))
 					}
+					fmt.Println("no valid answer", string(jsonRes))
 				} else {
-					//fmt.Println("Unresolvebale to MiekgResult")
+					fmt.Println("Unresolvebale to MiekgResult", string(jsonRes))
 				}
 			}
 
