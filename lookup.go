@@ -162,7 +162,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 			if err != nil {
 				log.Fatal("Unable to marshal JSON result", err)
 			}
-			//output <- string(jsonRes)
+			output <- string(jsonRes)
 			//fmt.Println("Json result:", string(jsonRes))
 			if len(gc.StdOutModules) != 0 {
 				res, ok := innerRes.(MiekgResult)
@@ -175,7 +175,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 							continue
 						}
 						if (gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"]) && len(answer.Answer) > 0 && answer.Answer != "<nil>" {
-							output<-answer.Answer
+							//output<-answer.Answer
 							found = true
 							break
 						}
