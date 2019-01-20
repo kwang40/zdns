@@ -25,7 +25,6 @@ import (
 
 	"github.com/miekg/dns"
 	log "github.com/sirupsen/logrus"
-	"fmt"
 )
 
 type routineMetadata struct {
@@ -162,30 +161,21 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 			if err != nil {
 				log.Fatal("Unable to marshal JSON result", err)
 			}
-			//output <- string(jsonRes)
-			//fmt.Println("Json result:", string(jsonRes))
+			output <- string(jsonRes)
 			if len(gc.StdOutModules) != 0 {
 				res, ok := innerRes.(MiekgResult)
 				if ok {
 					answers := res.Answers
-					found := false
 					for i := range(answers) {
 						answer, answerOk := answers[i].(MiekgAnswer)
 						if !answerOk {
-							fmt.Println("Unresolvebale to MiekgAnswer", string(jsonRes))
 							continue
 						}
 						if (gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"]) && len(answer.Answer) > 0 && answer.Answer != "<nil>" {
-							output<-answer.Answer
-							found = true
+							outStdChan<-answer.Answer
 							break
 						}
 					}
-					if !found {
-						fmt.Println("no valid answer", string(jsonRes))
-					}
-				} else {
-					fmt.Println("Unresolvebale to MiekgResult", string(jsonRes))
 				}
 			}
 
