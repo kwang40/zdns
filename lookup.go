@@ -306,63 +306,64 @@ func (h *RedisOutputHandler) Close() {
 	h.client.Close()
 }
 
+
+
 func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGroup) error {
 	defer (*wg).Done()
 
 	for r := range results {
-		res, ok := r.Data.(MiekgResult)
-		if !ok {
-			o, err := json.Marshal(res)
+		var key, domain string
+		switch res := r.Data.(type) {
+		case MiekgResult:
+			for _, a := range res.Answers {
+				if miekgAnswer, ok := a.(MiekgAnswer); ok {
+					if miekgAnswer.Type == dns.TypeToString[dns.TypeA] || miekgAnswer.Type == dns.TypeToString[dns.TypeAAAA] {
+						key = miekgAnswer.Answer
+						domain = r.Name
+					} else {
+						continue
+					}
+				}
+
+				h.saveToRedis(key, domain)
+			}
+		default:
+			o, err := json.Marshal(r)
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Warn("unable to parse result: ", string(o))
+			log.Warnf("unable to parse %T result: %s\n", r.Data, string(o))
 		}
-
-		for _, a := range res.Answers {
-			var key, domain string
-			if miekgAnswer, ok := a.(MiekgAnswer); ok {
-				if miekgAnswer.Type == dns.TypeToString[dns.TypeA] || miekgAnswer.Type == dns.TypeToString[dns.TypeAAAA] {
-					key = miekgAnswer.Answer
-					domain = miekgAnswer.Name
-				}
-			} //else {
-			//} else if mxAnswer, ok := a.(miekg.MXAnswer); ok {
-			//	key = mxAnswer.Answer.Answer
-			//	domain = mxAnswer.Answer.Name
-			//} else {
-			//	log.Warn("unimplemented answer type (not MiekgAnswer or MXAnswer)r")
-			//}
-
-			var value []string
-			redisValue, err := h.client.Get(key).Result()
-			if err == redis.Nil { // no key found
-				value = make([]string, 0)
-			} else if err != nil {
-				log.Fatal("unable to get key:", err)
-			} else {
-				err = json.Unmarshal([]byte(redisValue), &value)
-				if err != nil {
-					log.Error("error unmarshalling redis string:", err)
-				}
-			}
-
-			if !contains(value, domain) {
-				value = append(value, domain)
-			}
-
-			jsonBytes, err := json.Marshal(value)
-			if err != nil {
-				log.Error("error marshalling redis:", err)
-			}
-			err = h.client.Set(key, string(jsonBytes[:]), 0).Err()
-			if err != nil {
-				log.Error("unable to set redis key:", err)
-			}
-		}
-
 	}
 	return nil
+}
+
+func (h *RedisOutputHandler) saveToRedis(key string, domain string) {
+	var value []string
+	redisValue, err := h.client.Get(key).Result()
+	if err == redis.Nil { // no key found
+		value = make([]string, 0)
+	} else if err != nil {
+		log.Fatal("unable to get key:", err)
+	} else {
+		err = json.Unmarshal([]byte(redisValue), &value)
+		if err != nil {
+			log.Error("error unmarshalling redis string:", err)
+		}
+	}
+
+	if !contains(value, domain) {
+		value = append(value, domain)
+	}
+
+	jsonBytes, err := json.Marshal(value)
+	if err != nil {
+		log.Error("error marshalling redis:", err)
+	}
+	err = h.client.Set(key, string(jsonBytes[:]), 0).Err()
+	if err != nil {
+		log.Error("unable to set redis key:", err)
+	}
 }
 
 func contains(arr []string, str string) bool {
