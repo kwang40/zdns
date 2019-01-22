@@ -60,14 +60,14 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 		if status != zdns.STATUS_NOERROR || err != nil {
 			return nil, trace, status, err
 		}
-		for _, a := range miekgResult.(miekg.Result).Answers {
+		for _, a := range miekgResult.(zdns.MiekgResult).Answers {
 			ans, ok := a.(zdns.MiekgAnswer)
 			if !ok {
 				continue
 			}
 			searchSet[ans.Name] = append(searchSet[ans.Name], ans)
 		}
-		for _, a := range miekgResult.(miekg.Result).Additional {
+		for _, a := range miekgResult.(zdns.MiekgResult).Additional {
 			ans, ok := a.(zdns.MiekgAnswer)
 			if !ok {
 				continue
