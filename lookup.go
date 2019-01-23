@@ -167,19 +167,28 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 			}
 			output <- string(jsonRes)
 			if len(gc.StdOutModules) != 0 {
-				res, ok := innerRes.(MiekgResult)
-				if ok {
-					answers := res.Answers
-					for i := range(answers) {
-						answer, answerOk := answers[i].(MiekgAnswer)
-						if !answerOk {
+				switch res := innerRes.(type) {
+				case MiekgResult:
+					for _, a := range res.Answers {
+						if miekgAnswer, ok := a.(MiekgAnswer); !ok {
 							continue
-						}
-						if (gc.StdOutModules[answer.Type] || gc.StdOutModules["ANY"]) && len(answer.Answer) > 0 && answer.Answer != "<nil>" {
-							outStdChan<-answer.Answer
-							break
+						} else {
+							if (gc.StdOutModules[miekgAnswer.Type] || gc.StdOutModules["ANY"]) && len(miekgAnswer.Answer) > 0 && miekgAnswer.Answer != "<nil>" {
+								outStdChan<-miekgAnswer.Answer
+								break
+							}
 						}
 					}
+				case ALookupResult:
+					if len(res.IPv4Addresses) > 0 {
+						outStdChan<-res.IPv4Addresses[0]
+					}
+				default:
+					o, err := json.Marshal(innerRes)
+					if err != nil {
+						log.Fatal(err)
+					}
+					log.Warnf("unable to parse %T result: %s\n", innerRes, string(o))
 				}
 			}
 
