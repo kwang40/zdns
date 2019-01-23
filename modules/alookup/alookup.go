@@ -24,11 +24,6 @@ import (
 	"github.com/kwang40/zdns/modules/miekg"
 )
 
-type Result struct {
-	IPv4Addresses []string `json:"ipv4_addresses,omitempty"`
-	IPv6Addresses []string `json:"ipv6_addresses,omitempty"`
-}
-
 // Per Connection Lookup ======================================================
 //
 type Lookup struct {
@@ -100,7 +95,7 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 }
 
 func (s *Lookup) DoTargetedLookup(name string, nameServer string) (interface{}, []interface{}, zdns.Status, error) {
-	res := Result{}
+	res := zdns.ALookupResult{}
 	searchSet := map[string][]zdns.MiekgAnswer{}
 	var ipv4 []string
 	var ipv6 []string

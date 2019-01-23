@@ -62,6 +62,10 @@ type MiekgResult struct {
 	Flags       DNSFlags      `json:"flags"`
 }
 
+type ALookupResult struct {
+	IPv4Addresses []string `json:"ipv4_addresses,omitempty"`
+	IPv6Addresses []string `json:"ipv6_addresses,omitempty"`
+}
 
 func GetDNSServers(path string) ([]string, error) {
 	c, err := dns.ClientConfigFromFile(path)
@@ -326,6 +330,10 @@ func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGr
 				}
 
 				h.saveToRedis(key, domain)
+			}
+		case ALookupResult:
+			if len(res.IPv4Addresses) > 0 {
+				h.saveToRedis(res.IPv4Addresses[0], r.Name)
 			}
 		default:
 			o, err := json.Marshal(r)
