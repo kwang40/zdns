@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/go-redis/redis"
 	_ "github.com/kwang40/zdns/iohandlers/file"
 	_ "github.com/kwang40/zdns/modules/alookup"
@@ -29,7 +30,6 @@ import (
 	_ "github.com/kwang40/zdns/modules/spf"
 	"log"
 	"os"
-	"strings"
 )
 
 var (
@@ -70,11 +70,10 @@ func main() {
 				log.Fatal("error unmarshalling redis string:", err)
 			}
 		}
-
 		for _, domain := range domains {
 			redisUrls, err := client.Get(domain).Result()
 			if err == redis.Nil { // no key found
-				domains = make([]string, 0)
+				urls = make([]string, 0)
 			} else if err != nil {
 				log.Fatal("unable to get key:", err)
 			} else {
@@ -83,14 +82,12 @@ func main() {
 					log.Fatal("error unmarshalling redis string:", err)
 				}
 			}
+			for _, u := range urls {
+				w.WriteString(fmt.Sprintf("%s,%s\n",ipAddr,u))
+			}
 		}
-
-		for _, u := range urls {
-			outputStr := []string{ipAddr, u + "\n"}
-			w.WriteString(strings.Join(outputStr, ","))
-		}
+		w.Flush()
 	}
-	w.Flush()
 
 	if err := s.Err(); err != nil {
 		log.Fatal("input unable to read stdin", err)
