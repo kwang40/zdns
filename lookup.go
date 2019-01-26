@@ -181,7 +181,9 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 					}
 				case ALookupResult:
 					if len(res.IPv4Addresses) > 0 {
-						outStdChan<-res.IPv4Addresses[0]
+						if (gc.StdOutModules["A"]) {
+							outStdChan<-res.IPv4Addresses[0]
+						}
 					}
 				default:
 					o, err := json.Marshal(innerRes)
