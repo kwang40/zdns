@@ -78,7 +78,7 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 	if !ok || len(res) == 0 {
 		// we have no data whatsoever about this name. return an empty recordset to the user
 		var ips []string
-		if len(res) == 0 {
+		if ok {
 			fmt.Println(len(res))
 		}
 		return ips, trace, zdns.STATUS_NO_ANSWER, nil
