@@ -191,6 +191,7 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 					if err != nil {
 						log.Fatal(err)
 					}
+					fmt.Println(len(gc.StdOutModules))
 					for k,_ := range(gc.StdOutModules) {
 						fmt.Println(k)
 					}
