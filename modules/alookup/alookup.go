@@ -22,6 +22,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/kwang40/zdns"
 	"github.com/kwang40/zdns/modules/miekg"
+	"fmt"
 )
 
 // Per Connection Lookup ======================================================
@@ -77,6 +78,9 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 	if !ok || len(res) == 0 {
 		// we have no data whatsoever about this name. return an empty recordset to the user
 		var ips []string
+		if len(res) == 0 {
+			fmt.Println(len(res))
+		}
 		return ips, trace, zdns.STATUS_NO_ANSWER, nil
 	} else if res[0].Type == dns.Type(dnsType).String() {
 		// we have IP addresses to hand back to the user. let's make an easy-to-use array of strings
