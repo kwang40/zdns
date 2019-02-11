@@ -186,11 +186,11 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 						}
 					}
 				default:
-					o, err := json.Marshal(innerRes)
+					_, err := json.Marshal(innerRes)
 					if err != nil {
 						log.Fatal(err)
 					}
-					log.Warnf("unable to parse %T result: %s\n", innerRes, string(o))
+					//log.Warnf("unable to parse %T result: %s\n", innerRes, string(o))
 				}
 			}
 
