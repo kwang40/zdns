@@ -85,6 +85,9 @@ func main() {
 		gc.StdOutModules = make(map[string]bool)
 	}
 	for _,module := range stdOutModules {
+		if len(module) == 0 {
+			continue
+		}
 		gc.StdOutModules[strings.ToUpper(module)] = true
 	}
 
