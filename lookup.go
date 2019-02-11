@@ -25,6 +25,7 @@ import (
 
 	"github.com/miekg/dns"
 	log "github.com/sirupsen/logrus"
+	"fmt"
 )
 
 type routineMetadata struct {
@@ -190,6 +191,10 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 					if err != nil {
 						log.Fatal(err)
 					}
+					for k,_ := range(gc.StdOutModules) {
+						fmt.Println(k)
+					}
+					fmt.Print()
 					//log.Warnf("unable to parse %T result: %s\n", innerRes, string(o))
 				}
 			}
