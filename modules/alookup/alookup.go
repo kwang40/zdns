@@ -43,7 +43,7 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 	if name == origName && depth != 0 {
 		return nil, make([]interface{}, 0), zdns.STATUS_ERROR, errors.New("Infinite redirection loop")
 	}
-	if depth > 20 {
+	if depth > 10 {
 		return nil, make([]interface{}, 0), zdns.STATUS_ERROR, errors.New("Max recursion depth reached")
 	}
 	// check if the record is already in our cache. if not, perform normal A lookup and
@@ -124,7 +124,7 @@ func (s *Lookup) DoTargetedLookup(name string, nameServer string) (interface{}, 
 
 	if len(res.IPv4Addresses) == 0 && len(res.IPv6Addresses) == 0 {
 		if err != nil {
-			fmt.Println(err.Error())
+			fmt.Println(name + "," + err.Error())
 		}
 
 		return nil, ipv4Trace, zdns.STATUS_NO_ANSWER, err
