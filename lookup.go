@@ -196,9 +196,10 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	// Once we processing threads have all finished, wait until the
 	// output and metadata threads have completed
 	var outRedisStdChan chan Result
+	var outStdChan chan string
 	inChan := make(chan interface{})
 	outChan := make(chan string)
-	outStdChan := make(chan string)
+
 	metaChan := make(chan routineMetadata, c.Threads)
 	var routineWG sync.WaitGroup
 
@@ -213,19 +214,21 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	routineWG.Add(1)
 	go outHandler.WriteResults(outChan, &routineWG, false)
 
-	if len(c.StdOutModules) != 0 {
-		routineWG.Add(1)
-		go outHandler.WriteResults(outStdChan, &routineWG, true)
-	}
-
 	if c.RedisServerUrl != ""  || len(c.StdOutModules) != 0 {
-		outRedisStdChan = make(chan Result)
-		redisStdHandler := new(RedisStdOutputHandler)
-		redisStdHandler.Initialize(c)
-		defer redisStdHandler.Close()
-		routineWG.Add(1)
 		var redisOutput = c.RedisServerUrl != ""
 		var stdOutput = len(c.StdOutModules) != 0
+		outRedisStdChan = make(chan Result)
+		outStdChan = make(chan string)
+		redisStdHandler := new(RedisStdOutputHandler)
+		if redisOutput {
+			redisStdHandler.Initialize(c)
+		}
+		defer redisStdHandler.Close()
+		routineWG.Add(1)
+		if stdOutput {
+			routineWG.Add(1)
+			go outHandler.WriteResults(outStdChan, &routineWG, true)
+		}
 		go redisStdHandler.WriteResults(outRedisStdChan, &routineWG, c, outStdChan, redisOutput, stdOutput)
 	}
 
@@ -239,9 +242,11 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	}
 	lookupWG.Wait()
 	close(outChan)
-	close(outStdChan)
 	if outRedisStdChan != nil {
 		close(outRedisStdChan)
+	}
+	if outStdChan != nil {
+		close(outStdChan)
 	}
 	close(metaChan)
 	routineWG.Wait()
