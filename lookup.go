@@ -25,7 +25,6 @@ import (
 
 	"github.com/miekg/dns"
 	log "github.com/sirupsen/logrus"
-	"fmt"
 )
 
 type routineMetadata struct {
@@ -101,7 +100,7 @@ func makeName(name string, prefix string) (string, bool) {
 	}
 }
 
-func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, outStdChan chan<- string, resultChannel chan<- Result, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
+func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, output chan<- string, resultChannel chan<- Result, metaChan chan<- routineMetadata, wg *sync.WaitGroup, threadID int) error {
 	f, err := (*g).MakeRoutineFactory(threadID)
 	if err != nil {
 		log.Fatal("Unable to create new routine factory", err.Error())
@@ -167,34 +166,6 @@ func doLookup(g *GlobalLookupFactory, gc *GlobalConf, input <-chan interface{}, 
 				log.Fatal("Unable to marshal JSON result", err)
 			}
 			output <- string(jsonRes)
-			if len(gc.StdOutModules) != 0 {
-				switch res := innerRes.(type) {
-				case MiekgResult:
-					for _, a := range res.Answers {
-						if miekgAnswer, ok := a.(MiekgAnswer); !ok {
-							continue
-						} else {
-							if (gc.StdOutModules[miekgAnswer.Type] || gc.StdOutModules["ANY"]) && len(miekgAnswer.Answer) > 0 && miekgAnswer.Answer != "<nil>" {
-								outStdChan<-miekgAnswer.Answer
-								break
-							}
-						}
-					}
-				case ALookupResult:
-					if len(res.IPv4Addresses) > 0 {
-						if (gc.StdOutModules["A"]) {
-							outStdChan<-res.IPv4Addresses[0]
-						}
-					}
-				default:
-					o, err := json.Marshal(innerRes)
-					if err != nil {
-						log.Fatal(err)
-					}
-					fmt.Print()
-					log.Warnf("unable to parse %T result: %s\n", innerRes, string(o))
-				}
-			}
 
 		}
 
@@ -224,7 +195,7 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	//	- process until inChan closes, then wg.done()
 	// Once we processing threads have all finished, wait until the
 	// output and metadata threads have completed
-	var outRedisChan chan Result
+	var outRedisStdChan chan Result
 	inChan := make(chan interface{})
 	outChan := make(chan string)
 	outStdChan := make(chan string)
@@ -247,13 +218,15 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 		go outHandler.WriteResults(outStdChan, &routineWG, true)
 	}
 
-	if c.RedisServerUrl != "" {
-		outRedisChan = make(chan Result)
-		redisHandler := new(RedisOutputHandler)
-		redisHandler.Initialize(c)
-		defer redisHandler.Close()
+	if c.RedisServerUrl != ""  || len(c.StdOutModules) != 0 {
+		outRedisStdChan = make(chan Result)
+		redisStdHandler := new(RedisStdOutputHandler)
+		redisStdHandler.Initialize(c)
+		defer redisStdHandler.Close()
 		routineWG.Add(1)
-		go redisHandler.WriteResults(outRedisChan, &routineWG)
+		var redisOutput = c.RedisServerUrl != ""
+		var stdOutput = len(c.StdOutModules) != 0
+		go redisStdHandler.WriteResults(outRedisStdChan, &routineWG, c, outStdChan, redisOutput, stdOutput)
 	}
 
 
@@ -262,13 +235,13 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	lookupWG.Add(c.Threads)
 	startTime := time.Now().Format(c.TimeFormat)
 	for i := 0; i < c.Threads; i++ {
-		go doLookup(g, c, inChan, outChan, outStdChan, outRedisChan, metaChan, &lookupWG, i)
+		go doLookup(g, c, inChan, outChan, outRedisStdChan, metaChan, &lookupWG, i)
 	}
 	lookupWG.Wait()
 	close(outChan)
 	close(outStdChan)
-	if outRedisChan != nil {
-		close(outRedisChan)
+	if outRedisStdChan != nil {
+		close(outRedisStdChan)
 	}
 	close(metaChan)
 	routineWG.Wait()
@@ -307,11 +280,11 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 }
 
 
-type RedisOutputHandler struct {
+type RedisStdOutputHandler struct {
 	client *redis.Client
 }
 
-func (h *RedisOutputHandler) Initialize(conf *GlobalConf) {
+func (h *RedisStdOutputHandler) Initialize(conf *GlobalConf) {
 	h.client = redis.NewClient(&redis.Options{
 		Addr:     conf.RedisServerUrl,
 		Password: conf.RedisServerPass,
@@ -319,14 +292,15 @@ func (h *RedisOutputHandler) Initialize(conf *GlobalConf) {
 	})
 }
 
-func (h *RedisOutputHandler) Close() {
+func (h *RedisStdOutputHandler) Close() {
 	h.client.Close()
 }
 
 
 
-func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGroup) error {
+func (h *RedisStdOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGroup, gc *GlobalConf, outStdChan chan<- string, redisOutput bool, stdOutput bool) error {
 	defer (*wg).Done()
+	var typeAStr = dns.TypeToString[dns.TypeA]
 
 	for r := range results {
 		var key, domain string
@@ -334,19 +308,30 @@ func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGr
 		case MiekgResult:
 			for _, a := range res.Answers {
 				if miekgAnswer, ok := a.(MiekgAnswer); ok {
-					if miekgAnswer.Type == dns.TypeToString[dns.TypeA] || miekgAnswer.Type == dns.TypeToString[dns.TypeAAAA] {
+					if (miekgAnswer.Type == dns.TypeToString[dns.TypeA] || miekgAnswer.Type == dns.TypeToString[dns.TypeAAAA]) && len(miekgAnswer.Answer) > 0 && miekgAnswer.Answer != "<nil>" {
 						key = miekgAnswer.Answer
 						domain = r.Name
 					} else {
 						continue
 					}
 				}
+				if redisOutput{
+					h.saveToRedis(key, domain)
+				}
+				if stdOutput && (gc.StdOutModules[typeAStr] || gc.StdOutModules["ANY"]) {
+					outStdChan<-key
+				}
 
-				h.saveToRedis(key, domain)
 			}
 		case ALookupResult:
 			if len(res.IPv4Addresses) > 0 {
-				h.saveToRedis(res.IPv4Addresses[0], r.Name)
+				if redisOutput {
+					h.saveToRedis(res.IPv4Addresses[0], r.Name)
+				}
+				if stdOutput && (gc.StdOutModules[typeAStr] || gc.StdOutModules["ANY"]) {
+					outStdChan<- res.IPv4Addresses[0]
+				}
+
 			}
 		default:
 			o, err := json.Marshal(r)
@@ -359,7 +344,7 @@ func (h *RedisOutputHandler) WriteResults(results <-chan Result, wg *sync.WaitGr
 	return nil
 }
 
-func (h *RedisOutputHandler) saveToRedis(key string, domain string) {
+func (h *RedisStdOutputHandler) saveToRedis(key string, domain string) {
 	var value []string
 	redisValue, err := h.client.Get(key).Result()
 	if err == redis.Nil { // no key found

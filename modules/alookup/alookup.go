@@ -22,7 +22,6 @@ import (
 	"github.com/miekg/dns"
 	"github.com/kwang40/zdns"
 	"github.com/kwang40/zdns/modules/miekg"
-	"fmt"
 )
 
 // Per Connection Lookup ======================================================
@@ -107,9 +106,8 @@ func (s *Lookup) DoTargetedLookup(name string, nameServer string) (interface{}, 
 	var ipv6 []string
 	var ipv4Trace []interface{}
 	var ipv6Trace []interface{}
-	var  err error
 	if s.Factory.Factory.IPv4Lookup || !s.Factory.Factory.IPv6Lookup {
-		ipv4, ipv4Trace, _, err = s.doLookupProtocol(name, nameServer, dns.TypeA, searchSet, name, 0)
+		ipv4, ipv4Trace, _, _ = s.doLookupProtocol(name, nameServer, dns.TypeA, searchSet, name, 0)
 		res.IPv4Addresses = make([]string, len(ipv4))
 		copy(res.IPv4Addresses, ipv4)
 	}
@@ -123,13 +121,9 @@ func (s *Lookup) DoTargetedLookup(name string, nameServer string) (interface{}, 
 	ipv4Trace = append(ipv4Trace, ipv6Trace...)
 
 	if len(res.IPv4Addresses) == 0 && len(res.IPv6Addresses) == 0 {
-		if err != nil {
-			fmt.Println(name + "," + err.Error())
-		}
-
-		return nil, ipv4Trace, zdns.STATUS_NO_ANSWER, err
+		return nil, ipv4Trace, zdns.STATUS_NO_ANSWER, nil
 	}
-	return res, ipv4Trace, zdns.STATUS_NOERROR, err
+	return res, ipv4Trace, zdns.STATUS_NOERROR, nil
 }
 
 // Per GoRoutine Factory ======================================================
