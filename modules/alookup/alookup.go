@@ -78,19 +78,9 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 	}
 	// our cache should now have any data that exists about the current name
 	res, ok := searchSet[name]
-	if !ok {
-		fmt.Println(name)
-		for _, domain := range(tmp) {
-			fmt.Print(domain + ", ")
-			fmt.Println()
-		}
-	}
 	if !ok || len(res) == 0 {
 		// we have no data whatsoever about this name. return an empty recordset to the user
 		var ips []string
-		if ok {
-			fmt.Println(len(res))
-		}
 		return ips, trace, zdns.STATUS_NO_ANSWER, nil
 	} else if res[0].Type == dns.Type(dnsType).String() {
 		// we have IP addresses to hand back to the user. let's make an easy-to-use array of strings
@@ -133,6 +123,10 @@ func (s *Lookup) DoTargetedLookup(name string, nameServer string) (interface{}, 
 	ipv4Trace = append(ipv4Trace, ipv6Trace...)
 
 	if len(res.IPv4Addresses) == 0 && len(res.IPv6Addresses) == 0 {
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
 		return nil, ipv4Trace, zdns.STATUS_NO_ANSWER, err
 	}
 	return res, ipv4Trace, zdns.STATUS_NOERROR, err
