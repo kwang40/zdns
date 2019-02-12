@@ -43,7 +43,7 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 	if name == origName && depth != 0 {
 		return nil, make([]interface{}, 0), zdns.STATUS_ERROR, errors.New("Infinite redirection loop")
 	}
-	if depth > 10 {
+	if depth > 20 {
 		return nil, make([]interface{}, 0), zdns.STATUS_ERROR, errors.New("Max recursion depth reached")
 	}
 	// check if the record is already in our cache. if not, perform normal A lookup and
