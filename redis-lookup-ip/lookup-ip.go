@@ -54,8 +54,25 @@ func main() {
 
 	s := bufio.NewScanner(os.Stdin)
 	w := bufio.NewWriter(os.Stdout)
+	openIPs := make(map[string]bool)
+	outDomains := make(map[string]bool)
+
 	for s.Scan() {
-		ipAddr := s.Text()
+		rawInput := s.Text()
+		var ipAddr string
+		if len(rawInput) > 0{
+			if rawInput[0] != '#'{
+				ipAddr = rawInput
+				openIPs[ipAddr] = true
+			} else {
+				ipAddr = rawInput[1:len(rawInput)]
+				if _, ok := openIPs[ipAddr]; !ok {
+					continue
+				}
+			}
+		} else {
+			continue
+		}
 
 		var domains []string
 		var urls []string
@@ -70,7 +87,12 @@ func main() {
 				log.Fatal("error unmarshalling redis string:", err)
 			}
 		}
+
 		for _, domain := range domains {
+			if hasSent, keyExist := outDomains[domain]; keyExist && hasSent {
+				continue
+			}
+			outDomains[domain] = true
 			redisUrls, err := client.Get(domain).Result()
 			if err == redis.Nil { // no key found
 				urls = make([]string, 0)
