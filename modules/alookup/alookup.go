@@ -39,6 +39,7 @@ func (s *Lookup) DoLookup(name string) (interface{}, []interface{}, zdns.Status,
 
 func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16, searchSet map[string][]zdns.MiekgAnswer, origName string, depth int) ([]string, []interface{}, zdns.Status, error) {
 	// avoid infinite loops
+	var tmp []string
 	if name == origName && depth != 0 {
 		return nil, make([]interface{}, 0), zdns.STATUS_ERROR, errors.New("Infinite redirection loop")
 	}
@@ -56,14 +57,13 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 		if status != zdns.STATUS_NOERROR || err != nil {
 			return nil, trace, status, err
 		}
-		fmt.Println(name)
 		for _, a := range miekgResult.(zdns.MiekgResult).Answers {
 			ans, ok := a.(zdns.MiekgAnswer)
 			if !ok {
 				continue
 			}
-			fmt.Println(","+ ans.Name)
 			lowerCaseName := strings.ToLower(ans.Name)
+			tmp = append(tmp, lowerCaseName)
 			searchSet[lowerCaseName] = append(searchSet[lowerCaseName], ans)
 		}
 		for _, a := range miekgResult.(zdns.MiekgResult).Additional {
@@ -72,11 +72,19 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 				continue
 			}
 			lowerCaseName := strings.ToLower(ans.Name)
+			tmp = append(tmp, lowerCaseName)
 			searchSet[lowerCaseName] = append(searchSet[lowerCaseName], ans)
 		}
 	}
 	// our cache should now have any data that exists about the current name
 	res, ok := searchSet[name]
+	if !ok {
+		fmt.Println(name)
+		for _, domain := range(tmp) {
+			fmt.Print(domain + ", ")
+			fmt.Println()
+		}
+	}
 	if !ok || len(res) == 0 {
 		// we have no data whatsoever about this name. return an empty recordset to the user
 		var ips []string
