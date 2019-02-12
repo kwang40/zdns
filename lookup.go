@@ -308,7 +308,8 @@ func (h *RedisStdOutputHandler) WriteResults(results <-chan Result, wg *sync.Wai
 	var typeAStr = dns.TypeToString[dns.TypeA]
 
 	for r := range results {
-		var key, domain string
+		var key = ""
+		var domain = ""
 		switch res := r.Data.(type) {
 		case MiekgResult:
 			for _, a := range res.Answers {
@@ -320,13 +321,14 @@ func (h *RedisStdOutputHandler) WriteResults(results <-chan Result, wg *sync.Wai
 						continue
 					}
 				}
+			}
+			if key != ""{
 				if redisOutput{
 					h.saveToRedis(key, domain)
 				}
 				if stdOutput && (gc.StdOutModules[typeAStr] || gc.StdOutModules["ANY"]) {
 					outStdChan<-key
 				}
-
 			}
 		case ALookupResult:
 			if len(res.IPv4Addresses) > 0 {
