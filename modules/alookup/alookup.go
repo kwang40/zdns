@@ -56,11 +56,13 @@ func (s *Lookup) doLookupProtocol(name string, nameServer string, dnsType uint16
 		if status != zdns.STATUS_NOERROR || err != nil {
 			return nil, trace, status, err
 		}
+		fmt.Println(name)
 		for _, a := range miekgResult.(zdns.MiekgResult).Answers {
 			ans, ok := a.(zdns.MiekgAnswer)
 			if !ok {
 				continue
 			}
+			fmt.Println(","+ ans.Name)
 			lowerCaseName := strings.ToLower(ans.Name)
 			searchSet[lowerCaseName] = append(searchSet[lowerCaseName], ans)
 		}
