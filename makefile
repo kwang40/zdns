@@ -9,7 +9,7 @@ clean:
 install: zdns/zdns
 	cd zdns && go install
 
-.PHONY: zdns/zdns clean
+.PHONY: extract-fqdn lookup-ip zdns/zdns clean
 
 extract-fqdn:
 	go build redis-store-url/extract-fqdn.go
