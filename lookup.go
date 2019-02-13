@@ -245,11 +245,13 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	if outRedisStdChan != nil {
 		close(outRedisStdChan)
 	}
+	close(metaChan)
+	routineWG.Wait()
 	if outStdChan != nil {
 		close(outStdChan)
 	}
-	close(metaChan)
-	routineWG.Wait()
+	
+
 	if c.MetadataFilePath != "" {
 		// we're done processing data. aggregate all the data from individual routines
 		metaData := aggregateMetadata(metaChan)
