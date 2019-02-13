@@ -59,6 +59,7 @@ func main() {
 
 	for s.Scan() {
 		rawInput := s.Text()
+		fmt.Println(rawInput)
 		var ipAddr string
 		if len(rawInput) > 0{
 			if rawInput[0] != '#'{
@@ -73,7 +74,7 @@ func main() {
 		} else {
 			continue
 		}
-		fmt.Println(ipAddr)
+		//fmt.Println(ipAddr)
 		var domains []string
 		var urls []string
 		redisDomains, err := client.Get(ipAddr).Result()
