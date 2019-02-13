@@ -250,7 +250,6 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	if outStdChan != nil {
 		close(outStdChan)
 	}
-	
 
 	if c.MetadataFilePath != "" {
 		// we're done processing data. aggregate all the data from individual routines
