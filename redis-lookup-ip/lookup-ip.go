@@ -55,7 +55,7 @@ func main() {
 	s := bufio.NewScanner(os.Stdin)
 	w := bufio.NewWriter(os.Stdout)
 	openIPs := make(map[string]bool)
-	outDomains := make(map[string]bool)
+	outUrls := make(map[string]bool)
 
 	for s.Scan() {
 		rawInput := s.Text()
@@ -89,10 +89,6 @@ func main() {
 		}
 
 		for _, domain := range domains {
-			if hasSent, keyExist := outDomains[domain]; keyExist && hasSent {
-				continue
-			}
-			outDomains[domain] = true
 			redisUrls, err := client.Get(domain).Result()
 			if err == redis.Nil { // no key found
 				urls = make([]string, 0)
@@ -105,6 +101,10 @@ func main() {
 				}
 			}
 			for _, u := range urls {
+				if hasSent, keyExist := outUrls[u]; keyExist && hasSent {
+					continue
+				}
+				outUrls[domain] = true
 				w.WriteString(fmt.Sprintf("%s,%s\n",ipAddr,u))
 			}
 		}
