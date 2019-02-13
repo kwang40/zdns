@@ -104,7 +104,7 @@ func main() {
 				if hasSent, keyExist := outUrls[u]; keyExist && hasSent {
 					continue
 				}
-				outUrls[domain] = true
+				outUrls[u] = true
 				w.WriteString(fmt.Sprintf("%s,%s\n",ipAddr,u))
 			}
 		}
