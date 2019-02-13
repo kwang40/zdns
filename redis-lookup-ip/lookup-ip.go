@@ -73,7 +73,7 @@ func main() {
 		} else {
 			continue
 		}
-		
+
 		var domains []string
 		var urls []string
 		redisDomains, err := client.Get(ipAddr).Result()

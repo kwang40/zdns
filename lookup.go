@@ -202,6 +202,7 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 
 	metaChan := make(chan routineMetadata, c.Threads)
 	var routineWG sync.WaitGroup
+	var stdRoutineWG sync.WaitGroup
 
 	inHandler := GetInputHandler(c.InputHandler)
 	outHandler := GetOutputHandler(c.OutputHandler)
@@ -226,8 +227,8 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 		defer redisStdHandler.Close()
 		routineWG.Add(1)
 		if stdOutput {
-			routineWG.Add(1)
-			go outHandler.WriteResults(outStdChan, &routineWG, true)
+			stdRoutineWG.Add(1)
+			go outHandler.WriteResults(outStdChan, &stdRoutineWG, true)
 		}
 		go redisStdHandler.WriteResults(outRedisStdChan, &routineWG, c, outStdChan, redisOutput, stdOutput)
 	}
@@ -242,15 +243,15 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 	}
 	lookupWG.Wait()
 	close(outChan)
+	close(metaChan)
 	if outRedisStdChan != nil {
 		close(outRedisStdChan)
 	}
-	close(metaChan)
 	routineWG.Wait()
 	if outStdChan != nil {
 		close(outStdChan)
 	}
-
+	stdRoutineWG.Wait()
 	if c.MetadataFilePath != "" {
 		// we're done processing data. aggregate all the data from individual routines
 		metaData := aggregateMetadata(metaChan)
