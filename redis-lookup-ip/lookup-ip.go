@@ -42,16 +42,16 @@ var (
 	redisServerDB   int
 )
 
-func outputWriter(wg *sync.WaitGroup, input <-chan *string) {
+func outputWriter(wg *sync.WaitGroup, input <-chan string) {
 	defer (*wg).Done()
 	w := bufio.NewWriter(os.Stdout)
 	for line := range input {
-		w.WriteString(*line)
+		w.WriteString(line)
 	}
 	w.Flush()
 }
 
-func worker(wg *sync.WaitGroup, input <-chan string, output chan<- *string) {
+func worker(wg *sync.WaitGroup, input <-chan string, output chan<- string) {
 	defer (*wg).Done()
 	client := redis.NewClient(&redis.Options{
 		Addr:     redisServerUrl,
@@ -110,8 +110,7 @@ func worker(wg *sync.WaitGroup, input <-chan string, output chan<- *string) {
 					continue
 				}
 				outUrls[u] = true
-				outputLine := fmt.Sprintf("%s,%s\n", ipAddr, u)
-				output<- &outputLine
+				output<-fmt.Sprintf("%s,%s\n", ipAddr, u)
 			}
 
 		}
@@ -126,7 +125,7 @@ func main() {
 
 	flags.Parse(os.Args[1:])
 
-	outChan := make(chan *string)
+	outChan := make(chan string)
 	var writerWG sync.WaitGroup
 	writerWG.Add(1)
 	go outputWriter(&writerWG, outChan)
