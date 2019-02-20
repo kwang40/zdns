@@ -343,11 +343,13 @@ func (h *RedisStdOutputHandler) WriteResults(results <-chan Result, wg *sync.Wai
 
 			}
 		default:
+			/*
 			o, err := json.Marshal(r)
 			if err != nil {
 				log.Fatal(err)
 			}
 			log.Warnf("unable to parse %T result: %s\n", r.Data, string(o))
+			*/
 		}
 	}
 	return nil
