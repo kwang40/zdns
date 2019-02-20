@@ -69,7 +69,6 @@ func worker(wg *sync.WaitGroup, input <-chan string, output chan<- string) {
 				ipAddr = rawInput
 				openIPs[ipAddr] = true
 			} else {
-				continue
 				ipAddr = rawInput[1:len(rawInput)]
 				if _, ok := openIPs[ipAddr]; !ok {
 					continue
