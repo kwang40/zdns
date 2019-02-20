@@ -18,7 +18,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"fmt"
+	_"fmt"
 	"github.com/go-redis/redis"
 	_ "github.com/kwang40/zdns/iohandlers/file"
 	_ "github.com/kwang40/zdns/modules/alookup"
@@ -55,7 +55,7 @@ func main() {
 	s := bufio.NewScanner(os.Stdin)
 	w := bufio.NewWriter(os.Stdout)
 	openIPs := make(map[string]bool)
-	outUrls := make(map[string]bool)
+	//outUrls := make(map[string]bool)
 
 	for s.Scan() {
 		rawInput := s.Text()
@@ -100,6 +100,7 @@ func main() {
 					log.Fatal("error unmarshalling redis string:", err)
 				}
 			}
+			/*
 			for _, u := range urls {
 				if hasSent, keyExist := outUrls[u]; keyExist && hasSent {
 					continue
@@ -107,6 +108,7 @@ func main() {
 				outUrls[u] = true
 				w.WriteString(fmt.Sprintf("%s,%s\n",ipAddr,u))
 			}
+			*/
 		}
 		w.Flush()
 	}
