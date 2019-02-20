@@ -15,11 +15,8 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
 	"flag"
 	_"fmt"
-	"github.com/go-redis/redis"
 	_ "github.com/kwang40/zdns/iohandlers/file"
 	_ "github.com/kwang40/zdns/modules/alookup"
 	_ "github.com/kwang40/zdns/modules/axfr"
@@ -28,8 +25,15 @@ import (
 	_ "github.com/kwang40/zdns/modules/mxlookup"
 	_ "github.com/kwang40/zdns/modules/nslookup"
 	_ "github.com/kwang40/zdns/modules/spf"
-	"log"
 	"os"
+	"log"
+	"sync"
+	"bufio"
+	"strings"
+	"strconv"
+	"github.com/go-redis/redis"
+	"encoding/json"
+	"fmt"
 )
 
 var (
@@ -38,32 +42,32 @@ var (
 	redisServerDB   int
 )
 
-func main() {
-	flags := flag.NewFlagSet("flags", flag.ExitOnError)
-	flags.StringVar(&redisServerUrl, "redis-url", "127.0.0.1:6379", "URL for redis server that stores one-to-many IP:domain mapping")
-	flags.StringVar(&redisServerPass, "redis-pass", "", "Password for redis server")
-	flags.IntVar(&redisServerDB, "redis-db", 0, "DB for redis server")
+func outputWriter(wg *sync.WaitGroup, input <-chan string) {
+	defer (*wg).Done()
+	w := bufio.NewWriter(os.Stdout)
+	for line := range input {
+		w.WriteString(line)
+	}
+	w.Flush()
+}
 
-	flags.Parse(os.Args[1:])
-
+func worker(wg *sync.WaitGroup, input <-chan string, output chan<- string) {
+	defer (*wg).Done()
 	client := redis.NewClient(&redis.Options{
 		Addr:     redisServerUrl,
 		Password: redisServerPass,
 		DB:       redisServerDB,
 	})
 
-	s := bufio.NewScanner(os.Stdin)
-	w := bufio.NewWriter(os.Stdout)
 	openIPs := make(map[string]bool)
-	//outUrls := make(map[string]bool)
+	outUrls := make(map[string]bool)
 
-	for s.Scan() {
-		rawInput := s.Text()
+	for rawInput := range input {
 		var ipAddr string
-		if len(rawInput) > 0{
-			if rawInput[0] != '#'{
+		if len(rawInput) > 0 {
+			if rawInput[0] != '#' {
 				ipAddr = rawInput
-				//openIPs[ipAddr] = true
+				openIPs[ipAddr] = true
 			} else {
 				continue
 				ipAddr = rawInput[1:len(rawInput)]
@@ -101,20 +105,63 @@ func main() {
 					log.Fatal("error unmarshalling redis string:", err)
 				}
 			}
-			/*
+
 			for _, u := range urls {
 				if hasSent, keyExist := outUrls[u]; keyExist && hasSent {
 					continue
 				}
 				outUrls[u] = true
-				w.WriteString(fmt.Sprintf("%s,%s\n",ipAddr,u))
+				output<-fmt.Sprintf("%s,%s\n", ipAddr, u)
 			}
-			*/
+
 		}
-		w.Flush()
 	}
+}
+
+func main() {
+	flags := flag.NewFlagSet("flags", flag.ExitOnError)
+	flags.StringVar(&redisServerUrl, "redis-url", "127.0.0.1:6379", "URL for redis server that stores one-to-many IP:domain mapping")
+	flags.StringVar(&redisServerPass, "redis-pass", "", "Password for redis server")
+	flags.IntVar(&redisServerDB, "redis-db", 0, "DB for redis server")
+
+	flags.Parse(os.Args[1:])
+
+	outChan := make(chan string)
+	var writerWG sync.WaitGroup
+	writerWG.Add(1)
+	go outputWriter(&writerWG, outChan)
+
+
+	var chans [256] chan string
+	for i := range chans {
+		chans[i] = make(chan string)
+	}
+	var WG sync.WaitGroup
+	WG.Add(256)
+	for i := 0; i < 256; i++ {
+		go worker(&WG, chans[i], outChan);
+	}
+
+	s := bufio.NewScanner(os.Stdin)
+	for s.Scan() {
+		rawInput := s.Text()
+		parts := strings.Split(rawInput, ".")
+		if len(parts) == 0 {
+			continue
+		}
+		idx,_ := strconv.Atoi(parts[len(parts)-1])
+		chans[idx]<-rawInput
+	}
+
+	for i := range chans {
+		close(chans[i])
+	}
+	WG.Wait()
+	close(outChan)
+	writerWG.Wait()
 
 	if err := s.Err(); err != nil {
 		log.Fatal("input unable to read stdin", err)
 	}
+
 }
