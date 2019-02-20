@@ -63,8 +63,9 @@ func main() {
 		if len(rawInput) > 0{
 			if rawInput[0] != '#'{
 				ipAddr = rawInput
-				openIPs[ipAddr] = true
+				//openIPs[ipAddr] = true
 			} else {
+				continue
 				ipAddr = rawInput[1:len(rawInput)]
 				if _, ok := openIPs[ipAddr]; !ok {
 					continue
