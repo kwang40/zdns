@@ -104,7 +104,7 @@ func worker(wg *sync.WaitGroup, input <-chan string, output chan<- string) {
 					log.Fatal("error unmarshalling redis string:", err)
 				}
 			}
-
+			continue
 			for _, u := range urls {
 				if hasSent, keyExist := outUrls[u]; keyExist && hasSent {
 					continue
