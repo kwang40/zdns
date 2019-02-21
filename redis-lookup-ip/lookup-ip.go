@@ -27,11 +27,8 @@ import (
 	_ "github.com/kwang40/zdns/modules/spf"
 	"os"
 	"log"
-	"sync"
 	"bufio"
 	"github.com/pkg/profile"
-	"strings"
-	"strconv"
 	"github.com/go-redis/redis"
 	"encoding/json"
 	"fmt"
@@ -44,30 +41,34 @@ var (
 	runProfile	bool
 )
 
-func outputWriter(wg *sync.WaitGroup, input <-chan string) {
-	defer (*wg).Done()
-	w := bufio.NewWriter(os.Stdout)
-	for line := range input {
-		w.WriteString(line)
-	}
-	w.Flush()
-}
+func main() {
+	flags := flag.NewFlagSet("flags", flag.ExitOnError)
+	flags.StringVar(&redisServerUrl, "redis-url", "127.0.0.1:6379", "URL for redis server that stores one-to-many IP:domain mapping")
+	flags.StringVar(&redisServerPass, "redis-pass", "", "Password for redis server")
+	flags.IntVar(&redisServerDB, "redis-db", 0, "DB for redis server")
+	flags.BoolVar(&runProfile, "p", false, "run the profiler")
 
-func worker(wg *sync.WaitGroup, input <-chan string, output chan<- string) {
-	defer (*wg).Done()
+	flags.Parse(os.Args[1:])
+	if runProfile {
+		defer profile.Start().Stop()
+	}
+
 	client := redis.NewClient(&redis.Options{
 		Addr:     redisServerUrl,
 		Password: redisServerPass,
 		DB:       redisServerDB,
 	})
 
+	s := bufio.NewScanner(os.Stdin)
+	w := bufio.NewWriter(os.Stdout)
 	openIPs := make(map[string]bool)
 	outUrls := make(map[string]bool)
 
-	for rawInput := range input {
+	for s.Scan() {
+		rawInput := s.Text()
 		var ipAddr string
-		if len(rawInput) > 0 {
-			if rawInput[0] != '#' {
+		if len(rawInput) > 0{
+			if rawInput[0] != '#'{
 				ipAddr = rawInput
 				openIPs[ipAddr] = true
 			} else {
@@ -111,61 +112,14 @@ func worker(wg *sync.WaitGroup, input <-chan string, output chan<- string) {
 					continue
 				}
 				outUrls[u] = true
-				output<-fmt.Sprintf("%s,%s\n", ipAddr, u)
+				w.WriteString(fmt.Sprintf("%s,%s\n",ipAddr,u))
 			}
-
 		}
+		w.Flush()
 	}
-}
-
-func main() {
-	flags := flag.NewFlagSet("flags", flag.ExitOnError)
-	flags.StringVar(&redisServerUrl, "redis-url", "127.0.0.1:6379", "URL for redis server that stores one-to-many IP:domain mapping")
-	flags.StringVar(&redisServerPass, "redis-pass", "", "Password for redis server")
-	flags.IntVar(&redisServerDB, "redis-db", 0, "DB for redis server")
-	flags.BoolVar(&runProfile, "p", false, "run the profiler")
-
-	flags.Parse(os.Args[1:])
-	if runProfile {
-		defer profile.Start().Stop()
-	}
-
-	outChan := make(chan string)
-	var writerWG sync.WaitGroup
-	writerWG.Add(1)
-	go outputWriter(&writerWG, outChan)
-
-
-	var chans [256] chan string
-	for i := range chans {
-		chans[i] = make(chan string)
-	}
-	var WG sync.WaitGroup
-	WG.Add(256)
-	for i := 0; i < 256; i++ {
-		go worker(&WG, chans[i], outChan);
-	}
-
-	s := bufio.NewScanner(os.Stdin)
-	for s.Scan() {
-		rawInput := s.Text()
-		parts := strings.Split(rawInput, ".")
-		if len(parts) == 0 {
-			continue
-		}
-		idx,_ := strconv.Atoi(parts[len(parts)-1])
-		chans[idx]<-rawInput
-	}
-
-	for i := range chans {
-		close(chans[i])
-	}
-	WG.Wait()
-	close(outChan)
-	writerWG.Wait()
 
 	if err := s.Err(); err != nil {
 		log.Fatal("input unable to read stdin", err)
 	}
-
 }
+
