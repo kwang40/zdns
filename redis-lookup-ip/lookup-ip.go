@@ -29,6 +29,7 @@ import (
 	"log"
 	"sync"
 	"bufio"
+	"github.com/pkg/profile"
 	"strings"
 	"strconv"
 	"github.com/go-redis/redis"
@@ -40,6 +41,7 @@ var (
 	redisServerUrl  string
 	redisServerPass string
 	redisServerDB   int
+	runProfile	bool
 )
 
 func outputWriter(wg *sync.WaitGroup, input <-chan string) {
@@ -104,7 +106,6 @@ func worker(wg *sync.WaitGroup, input <-chan string, output chan<- string) {
 					log.Fatal("error unmarshalling redis string:", err)
 				}
 			}
-			continue
 			for _, u := range urls {
 				if hasSent, keyExist := outUrls[u]; keyExist && hasSent {
 					continue
@@ -122,8 +123,12 @@ func main() {
 	flags.StringVar(&redisServerUrl, "redis-url", "127.0.0.1:6379", "URL for redis server that stores one-to-many IP:domain mapping")
 	flags.StringVar(&redisServerPass, "redis-pass", "", "Password for redis server")
 	flags.IntVar(&redisServerDB, "redis-db", 0, "DB for redis server")
+	flags.BoolVar(&runProfile, "p", false, "run the profiler")
 
 	flags.Parse(os.Args[1:])
+	if runProfile {
+		defer profile.Start().Stop()
+	}
 
 	outChan := make(chan string)
 	var writerWG sync.WaitGroup
