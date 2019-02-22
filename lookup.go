@@ -223,8 +223,8 @@ func DoLookups(g *GlobalLookupFactory, c *GlobalConf) error {
 		redisStdHandler := new(RedisStdOutputHandler)
 		if redisOutput {
 			redisStdHandler.Initialize(c)
+			defer redisStdHandler.Close()
 		}
-		defer redisStdHandler.Close()
 		routineWG.Add(1)
 		if stdOutput {
 			stdRoutineWG.Add(1)
@@ -329,7 +329,7 @@ func (h *RedisStdOutputHandler) WriteResults(results <-chan Result, wg *sync.Wai
 					h.saveToRedis(key, domain)
 				}
 				if stdOutput && (gc.StdOutModules[typeAStr] || gc.StdOutModules["ANY"]) {
-					outStdChan<-key
+					outStdChan<- key + "," + domain
 				}
 			}
 		case ALookupResult:
@@ -338,7 +338,7 @@ func (h *RedisStdOutputHandler) WriteResults(results <-chan Result, wg *sync.Wai
 					h.saveToRedis(res.IPv4Addresses[0], r.Name)
 				}
 				if stdOutput && (gc.StdOutModules[typeAStr] || gc.StdOutModules["ANY"]) {
-					outStdChan<- res.IPv4Addresses[0]
+					outStdChan<- res.IPv4Addresses[0] + "," + r.Name
 				}
 
 			}
